@@ -20,7 +20,7 @@ from shared.models.base import Base
 from shared.models import (
     Vulnerability, Asset, Patch, Deployment,
     VulnerabilityStatus, AssetType, AssetStatus,
-    PatchType, PatchStatus, DeploymentStatus
+    PatchType, PatchStatus, DeploymentStatus, DeploymentStrategy
 )
 from shared.config.settings import Settings
 
@@ -134,15 +134,15 @@ def sample_patch(test_db: Session, sample_vulnerability: Vulnerability) -> Patch
 
 
 @pytest.fixture
-def sample_deployment(test_db: Session, sample_patch: Patch) -> Deployment:
+def sample_deployment(test_db: Session, sample_patch: Patch, sample_asset: Asset) -> Deployment:
     """Create a sample deployment"""
     deployment = Deployment(
+        deployment_id="deploy-fixture-001",
         patch_id=sample_patch.id,
-        strategy="rolling",
-        status=DeploymentStatus.PENDING,
-        total_assets=10,
-        successful_assets=0,
-        failed_assets=0
+        asset_id=sample_asset.id,
+        strategy=DeploymentStrategy.ROLLING,
+        deployment_method="ansible",
+        status=DeploymentStatus.PENDING
     )
     test_db.add(deployment)
     test_db.commit()
