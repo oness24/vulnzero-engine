@@ -93,12 +93,18 @@ async def _generate_patch_async(vulnerability_id: int, llm_provider: str):
             vulnerability_id=vulnerability_id,
             title=f"AI-generated patch for {vulnerability.cve_id}",
             description=f"Generated using {llm_provider} - {patch_result.llm_model}",
-            patch_type=PatchTypeModel.CODE,  # Map to appropriate type
+            patch_type=PatchTypeModel.SCRIPT_EXECUTION,  # AI-generated scripts
             patch_content=patch_result.patch_content,
             rollback_script=patch_result.rollback_content,
             status=PatchStatus.VALIDATED if validation.is_valid else PatchStatus.GENERATED,
-            confidence_score=patch_result.confidence_score,
-            validation_score=validation.safety_score,
+            confidence_score=patch_result.confidence_score * 100,  # Convert to 0-100 scale
+            validation_passed=validation.is_valid,
+            validation_errors=validation.errors if not validation.is_valid else None,
+            safety_checks={
+                "safety_score": validation.safety_score,
+                "warnings": validation.warnings,
+                "issues": [issue for issue in validation.issues]
+            },
             llm_provider=llm_provider,
             llm_model=patch_result.llm_model,
             llm_tokens_used=patch_result.tokens_used,
@@ -123,7 +129,8 @@ async def _generate_patch_async(vulnerability_id: int, llm_provider: str):
             severity="info",
             changes={
                 "confidence_score": patch_result.confidence_score,
-                "validation_score": validation.safety_score,
+                "safety_score": validation.safety_score,
+                "validation_passed": validation.is_valid,
                 "validation_status": "valid" if validation.is_valid else "invalid",
             },
         )
@@ -140,8 +147,8 @@ async def _generate_patch_async(vulnerability_id: int, llm_provider: str):
             "vulnerability_id": vulnerability_id,
             "cve_id": vulnerability.cve_id,
             "confidence_score": patch_result.confidence_score,
-            "validation_score": validation.safety_score,
-            "is_valid": validation.is_valid,
+            "safety_score": validation.safety_score,
+            "validation_passed": validation.is_valid,
             "validation_errors": validation.errors,
             "validation_warnings": validation.warnings,
             "tokens_used": patch_result.tokens_used,

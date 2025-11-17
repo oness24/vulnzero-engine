@@ -21,6 +21,9 @@ from shared.models import Patch, Vulnerability, AuditLog
 from shared.models.patch import PatchStatus, PatchType
 from shared.models.audit_log import AuditAction, AuditResourceType
 
+# Import Celery task for AI patch generation
+from services.patch_generator.tasks.generation_tasks import generate_patch_for_vulnerability
+
 router = APIRouter()
 
 
@@ -453,9 +456,11 @@ async def generate_patch(
             detail=f"Vulnerability already has {existing_patches} active patch(es). Review existing patches first."
         )
 
-    # TODO: Trigger Celery task for AI patch generation
-    # from services.patch_generator.tasks import generate_patch_ai
-    # task = generate_patch_ai.delay(vulnerability_id=vulnerability_id)
+    # Trigger Celery task for AI patch generation
+    task = generate_patch_for_vulnerability.delay(
+        vulnerability_id=vulnerability_id,
+        llm_provider="openai"  # Default to OpenAI, can be made configurable
+    )
 
     # Create audit log
     audit_log = AuditLog(
@@ -479,7 +484,8 @@ async def generate_patch(
         "vulnerability_id": vulnerability_id,
         "cve_id": vulnerability.cve_id,
         "triggered_by": current_user.get("email"),
-        # "task_id": task.id  # Uncomment when Celery is integrated
+        "task_id": task.id,  # Celery task ID for tracking
+        "status": "processing"
     }
 
 

@@ -9,6 +9,14 @@ import re
 import logging
 from pydantic import BaseModel
 
+# Import bashlex for proper bash syntax validation
+try:
+    import bashlex
+    BASHLEX_AVAILABLE = True
+except ImportError:
+    BASHLEX_AVAILABLE = False
+    logging.warning("bashlex not available - using basic syntax validation")
+
 logger = logging.getLogger(__name__)
 
 
@@ -128,9 +136,27 @@ class PatchValidator:
         return result
 
     def _check_bash_syntax(self, content: str) -> List[str]:
-        """Basic bash syntax checking"""
+        """
+        Bash syntax checking with bashlex (if available).
+        Falls back to basic validation if bashlex is not installed.
+        """
         errors = []
 
+        # Try using bashlex for proper syntax validation
+        if BASHLEX_AVAILABLE:
+            try:
+                # Parse the bash script to check for syntax errors
+                bashlex.parse(content)
+                # If parsing succeeds, no syntax errors
+                return []
+            except bashlex.errors.ParsingError as e:
+                errors.append(f"Bash syntax error: {str(e)}")
+                return errors
+            except Exception as e:
+                # If bashlex fails unexpectedly, fall back to basic checks
+                self.logger.warning(f"bashlex parsing failed, using basic validation: {e}")
+
+        # Fallback: Basic syntax checking (original implementation)
         # Check for unclosed quotes
         single_quotes = content.count("'") - content.count("\\'")
         double_quotes = content.count('"') - content.count('\\"')
