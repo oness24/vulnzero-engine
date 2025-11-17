@@ -37,18 +37,94 @@ def init() -> None:
 @click.option("--os-type", default="ubuntu", help="Operating system type")
 @click.option("--os-version", default="22.04", help="Operating system version")
 @click.option("--output", "-o", type=click.Path(), help="Output file for generated patch")
-def generate_patch(cve_id: str, os_type: str, os_version: str, output: str) -> None:
+@click.option("--save-db", is_flag=True, help="Save patch to database")
+def generate_patch(cve_id: str, os_type: str, os_version: str, output: str, save_db: bool) -> None:
     """
     Generate a patch for a specific CVE.
 
     Example: vulnzero generate-patch CVE-2024-1234 --os-type ubuntu --os-version 22.04
     """
-    console.print(f"[bold blue]Generating patch for {cve_id}...[/bold blue]")
-    console.print(f"Target OS: {os_type} {os_version}")
+    from rich.panel import Panel
+    from rich.syntax import Syntax
 
-    # TODO: Implement patch generation
-    console.print("[yellow]⚠[/yellow] Patch generation not yet implemented")
-    console.print("[dim]This feature will use AI to generate remediation scripts[/dim]")
+    from vulnzero.services.patch_generator import PatchGenerator
+    from vulnzero.shared.models import Vulnerability
+
+    console.print(f"[bold blue]Generating patch for {cve_id}...[/bold blue]")
+    console.print(f"Target OS: {os_type} {os_version}\n")
+
+    try:
+        # Create a temporary vulnerability object for generation
+        vuln = Vulnerability(
+            cve_id=cve_id,
+            title=f"Vulnerability {cve_id}",
+            description="Fetching from NVD...",
+            severity="unknown",
+        )
+
+        # Generate patch
+        with console.status("[bold green]Generating patch with AI..."):
+            generator = PatchGenerator()
+            result = generator.generate_patch(
+                vulnerability=vuln, os_type=os_type, os_version=os_version
+            )
+
+        if not result.success:
+            console.print(f"[red]✗[/red] {result.error_message}")
+            raise click.Abort()
+
+        # Display CVE information
+        if result.cve_data:
+            console.print(Panel(
+                f"[bold]CVE ID:[/bold] {result.cve_data.cve_id}\n"
+                f"[bold]Severity:[/bold] {result.cve_data.severity.upper()}\n"
+                f"[bold]CVSS Score:[/bold] {result.cve_data.cvss_score or 'N/A'}\n"
+                f"[bold]Description:[/bold] {result.cve_data.description[:200]}...",
+                title="[bold cyan]CVE Information[/bold cyan]",
+            ))
+
+        # Display validation results
+        val_result = result.validation_result
+        if val_result:
+            status_icon = "[green]✓[/green]" if val_result.is_valid else "[red]✗[/red]"
+            console.print(f"\n{status_icon} [bold]Validation Results:[/bold]")
+            console.print(f"  Safety Score: {val_result.safety_score:.2%}")
+            console.print(f"  Syntax Valid: {'✓' if val_result.syntax_valid else '✗'}")
+            console.print(f"  Issues Found: {len(val_result.issues)}")
+            console.print(f"  Confidence: {result.patch.confidence_score:.2%}")
+
+            if val_result.issues:
+                console.print("\n[yellow]Issues:[/yellow]")
+                for issue in val_result.issues[:5]:  # Show first 5
+                    console.print(f"  [{issue.severity.upper()}] {issue.description}")
+
+        # Display the generated patch
+        console.print("\n[bold cyan]Generated Patch:[/bold cyan]")
+        syntax = Syntax(result.patch.patch_content, "bash", theme="monokai", line_numbers=True)
+        console.print(syntax)
+
+        # Save to file if requested
+        if output:
+            with open(output, "w") as f:
+                f.write(result.patch.patch_content)
+            console.print(f"\n[green]✓[/green] Patch saved to {output}")
+
+        # Save to database if requested
+        if save_db:
+            console.print("\n[yellow]⚠[/yellow] Database save not yet implemented")
+
+        # Show recommendations
+        if val_result and val_result.recommendations:
+            console.print("\n[bold yellow]Recommendations:[/bold yellow]")
+            for rec in val_result.recommendations[:3]:
+                console.print(f"  • {rec}")
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error: {e}")
+        import traceback
+
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+        raise click.Abort()
 
 
 @main.command()
