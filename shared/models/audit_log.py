@@ -208,7 +208,7 @@ class AuditLog(Base):
         comment="Before/after state for updates (e.g., field changes)"
     )
 
-    metadata = Column(
+    audit_metadata = Column(
         JSON,
         nullable=True,
         comment="Additional context metadata"

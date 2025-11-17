@@ -237,10 +237,6 @@ class Settings(BaseSettings):
         """Check if running in development"""
         return self.environment.lower() == "development"
 
-    class Config:
-        """Pydantic config"""
-        case_sensitive = False
-
 
 # Global settings instance
 settings = Settings()

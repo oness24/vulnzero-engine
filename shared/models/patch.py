@@ -320,7 +320,7 @@ class Patch(Base):
         comment="Custom tags"
     )
 
-    metadata = Column(
+    patch_metadata = Column(
         JSON,
         nullable=True,
         comment="Additional metadata"

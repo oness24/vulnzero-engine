@@ -164,7 +164,7 @@ class PreDeployValidator:
 
         in_maintenance = []
         for asset in assets:
-            if asset.metadata and asset.metadata.get("maintenance_mode"):
+            if asset.asset_metadata and asset.asset_metadata.get("maintenance_mode"):
                 in_maintenance.append(f"Asset {asset.id} ({asset.hostname})")
 
         if in_maintenance:

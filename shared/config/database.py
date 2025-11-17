@@ -28,20 +28,31 @@ engine = create_engine(
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_conn, connection_record):
     """Set SQLite pragmas for better performance (if using SQLite)"""
-    if "sqlite" in settings.database_url:
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.close()
+    # Check the actual connection type
+    try:
+        if hasattr(dbapi_conn, '__class__') and 'sqlite' in dbapi_conn.__class__.__module__:
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.close()
+    except Exception:
+        # Silently skip if this isn't a SQLite connection
+        pass
 
 
 @event.listens_for(Engine, "connect")
 def set_postgres_settings(dbapi_conn, connection_record):
     """Set PostgreSQL session settings"""
-    if "postgresql" in settings.database_url:
-        cursor = dbapi_conn.cursor()
-        cursor.execute("SET timezone='UTC'")
-        cursor.close()
+    # Check the actual connection type, not just settings
+    try:
+        # Only run for PostgreSQL connections
+        if hasattr(dbapi_conn, '__class__') and 'psycopg' in dbapi_conn.__class__.__module__:
+            cursor = dbapi_conn.cursor()
+            cursor.execute("SET timezone='UTC'")
+            cursor.close()
+    except Exception:
+        # Silently skip if this isn't a PostgreSQL connection
+        pass
 
 
 # Create session factory

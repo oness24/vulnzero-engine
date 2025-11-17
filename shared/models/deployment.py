@@ -378,7 +378,7 @@ class Deployment(Base):
         comment="Custom tags"
     )
 
-    metadata = Column(
+    deployment_metadata = Column(
         JSON,
         nullable=True,
         comment="Additional metadata"

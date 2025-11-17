@@ -355,7 +355,7 @@ class RemediationJob(Base):
         comment="Custom tags for filtering/organization"
     )
 
-    metadata = Column(
+    job_metadata = Column(
         JSON,
         nullable=True,
         comment="Additional metadata"

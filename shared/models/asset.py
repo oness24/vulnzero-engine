@@ -301,7 +301,7 @@ class Asset(Base):
         comment="Custom tags for organization (key-value pairs)"
     )
 
-    metadata = Column(
+    asset_metadata = Column(
         JSON,
         nullable=True,
         comment="Additional metadata (flexible schema)"

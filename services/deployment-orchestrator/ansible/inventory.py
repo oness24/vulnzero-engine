@@ -39,7 +39,7 @@ class InventoryManager:
         # Group assets by type
         groups: Dict[str, List[Asset]] = {}
         for asset in assets:
-            asset_type = asset.asset_type or "ungrouped"
+            asset_type = asset.type or "ungrouped"
             if asset_type not in groups:
                 groups[asset_type] = []
             groups[asset_type].append(asset)
@@ -58,11 +58,11 @@ class InventoryManager:
                 line += " ansible_user=root"
 
                 # Add asset metadata as variables
-                if asset.metadata:
-                    if "ssh_port" in asset.metadata:
-                        line += f" ansible_port={asset.metadata['ssh_port']}"
-                    if "python_interpreter" in asset.metadata:
-                        line += f" ansible_python_interpreter={asset.metadata['python_interpreter']}"
+                if asset.asset_metadata:
+                    if "ssh_port" in asset.asset_metadata:
+                        line += f" ansible_port={asset.asset_metadata['ssh_port']}"
+                    if "python_interpreter" in asset.asset_metadata:
+                        line += f" ansible_python_interpreter={asset.asset_metadata['python_interpreter']}"
 
                 inventory.write(f"{line}\n")
 
@@ -97,7 +97,7 @@ class InventoryManager:
         # Group assets
         groups: Dict[str, List[str]] = {}
         for asset in assets:
-            asset_type = asset.asset_type or "ungrouped"
+            asset_type = asset.type or "ungrouped"
             if asset_type not in groups:
                 groups[asset_type] = []
 
@@ -108,12 +108,12 @@ class InventoryManager:
                 "ansible_host": asset.ip_address or asset.hostname,
                 "ansible_user": "root",
                 "asset_id": asset.id,
-                "asset_type": asset.asset_type,
+                "asset_type": asset.type,
             }
 
-            if asset.metadata:
-                if "ssh_port" in asset.metadata:
-                    inventory["_meta"]["hostvars"][asset.hostname]["ansible_port"] = asset.metadata["ssh_port"]
+            if asset.asset_metadata:
+                if "ssh_port" in asset.asset_metadata:
+                    inventory["_meta"]["hostvars"][asset.hostname]["ansible_port"] = asset.asset_metadata["ssh_port"]
 
         # Add groups
         for group_name, hosts in groups.items():
