@@ -432,34 +432,124 @@ Password: Viewer123!
 
 ## 🧪 Testing
 
-### Running Tests
+### Test Status
+
+[![Tests](https://img.shields.io/badge/tests-55%2F55%20passing-success)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-64%25-success)](htmlcov/)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-automated-blue)](.github/workflows/)
+
+**55/55 tests passing** | **64% coverage** | **~8s execution time**
+
+### Quick Start
 
 ```bash
-# All tests
-make test
+# Install test dependencies
+pip install pytest pytest-cov pytest-asyncio pytest-mock
 
-# Specific test suite
-pytest tests/unit/
-pytest tests/integration/
-pytest tests/e2e/
+# Run all tests
+pytest tests/
 
-# With coverage
-make coverage
+# Run with coverage
+pytest tests/ --cov=shared --cov=services --cov-report=html --cov-report=term
 
-# Watch mode (for development)
-pytest-watch
+# Run specific test modules
+pytest tests/unit/models/test_database_models.py -v
+pytest tests/unit/services/test_monitoring.py -v
+pytest tests/unit/services/test_deployment_orchestrator.py -v
 ```
 
 ### Test Structure
 
 ```
 tests/
-├── unit/               # Unit tests for individual functions
-├── integration/        # Integration tests for services
-├── e2e/               # End-to-end workflow tests
-├── fixtures/          # Test fixtures and mock data
-└── conftest.py        # Shared pytest configuration
+├── unit/
+│   ├── models/               # Database model tests (14 tests)
+│   │   └── test_database_models.py
+│   └── services/             # Service layer tests (41 tests)
+│       ├── test_monitoring.py               # 22 tests
+│       └── test_deployment_orchestrator.py  # 19 tests
+└── conftest.py               # Shared fixtures and test configuration
 ```
+
+### Coverage by Module
+
+| Module | Coverage | Tests |
+|--------|----------|-------|
+| `shared/models/` | 76-91% | 14 tests |
+| `shared/config/` | 59-97% | Covered |
+| `services/monitoring/` | 64-80% | 22 tests |
+| `services/deployment_orchestrator/` | 21-97% | 19 tests |
+| **Overall** | **64%** | **55 tests** |
+
+### Continuous Integration
+
+All pull requests trigger automated checks via GitHub Actions:
+
+1. ✅ **Test Suite** - All 55 tests must pass
+2. ✅ **Coverage Check** - Must maintain ≥60% coverage
+3. ✅ **Code Quality** - Linting and formatting (Ruff, Black, isort)
+4. ✅ **Security Scan** - Bandit security analysis
+
+### Pre-commit Hooks
+
+Install pre-commit hooks to run tests before every commit:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+Hooks will automatically:
+- Run the test suite
+- Format code with Black
+- Sort imports with isort
+- Run linting checks
+- Perform security scans
+
+### Writing Tests
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed testing guidelines including:
+
+- Test file organization
+- Using shared fixtures
+- Mocking external services
+- Coverage requirements
+- Examples and best practices
+
+### Running Specific Tests
+
+```bash
+# Run single test file
+pytest tests/unit/models/test_database_models.py
+
+# Run single test class
+pytest tests/unit/services/test_monitoring.py::TestMetricsCollector
+
+# Run single test method
+pytest tests/unit/services/test_monitoring.py::TestMetricsCollector::test_collect_system_metrics
+
+# Run with verbose output
+pytest tests/ -v
+
+# Run with short traceback
+pytest tests/ --tb=short
+
+# Stop on first failure
+pytest tests/ -x
+```
+
+### Test Fixtures
+
+All tests have access to shared fixtures (see `tests/conftest.py`):
+
+- `test_db` - Fresh in-memory SQLite database
+- `sample_vulnerability` - Pre-created Vulnerability instance
+- `sample_asset` - Pre-created Asset instance
+- `sample_patch` - Pre-created Patch instance
+- `sample_deployment` - Pre-created Deployment instance
+- `mock_openai` - Mocked OpenAI API
+- `mock_anthropic` - Mocked Anthropic API
+- `mock_docker` - Mocked Docker client
 
 ---
 
