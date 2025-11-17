@@ -111,7 +111,34 @@ def generate_patch(cve_id: str, os_type: str, os_version: str, output: str, save
 
         # Save to database if requested
         if save_db:
-            console.print("\n[yellow]⚠[/yellow] Database save not yet implemented")
+            try:
+                from vulnzero.services.patch_generator.storage import PatchStorageService
+                from vulnzero.shared.models import get_db
+
+                db = next(get_db())
+                storage = PatchStorageService(db)
+
+                # Create/update vulnerability
+                vuln_data = {
+                    "cve_id": result.cve_data.cve_id,
+                    "title": f"Vulnerability {result.cve_data.cve_id}",
+                    "description": result.cve_data.description,
+                    "severity": result.cve_data.severity,
+                    "cvss_score": result.cve_data.cvss_score,
+                    "cvss_vector": result.cve_data.cvss_vector,
+                }
+                stored_vuln = storage.create_or_update_vulnerability(vuln_data)
+
+                # Save patch
+                result.patch.vulnerability_id = stored_vuln.id
+                saved_patch = storage.save_patch(result.patch, stored_vuln)
+
+                console.print(f"\n[green]✓[/green] Saved to database:")
+                console.print(f"  Vulnerability ID: {stored_vuln.id}")
+                console.print(f"  Patch ID: {saved_patch.patch_id}")
+
+            except Exception as e:
+                console.print(f"\n[red]✗[/red] Failed to save to database: {e}")
 
         # Show recommendations
         if val_result and val_result.recommendations:
@@ -133,20 +160,56 @@ def generate_patch(cve_id: str, os_type: str, os_version: str, output: str, save
 @click.option("--limit", default=20, help="Number of vulnerabilities to display")
 def list_vulns(severity: str, status: str, limit: int) -> None:
     """List vulnerabilities in the database."""
-    console.print("[bold blue]Listing vulnerabilities...[/bold blue]")
+    from vulnzero.shared.models import Vulnerability, get_db
 
-    # TODO: Query database
-    table = Table(title="Vulnerabilities")
-    table.add_column("CVE ID", style="cyan")
-    table.add_column("Severity", style="magenta")
-    table.add_column("Status", style="green")
-    table.add_column("Discovered", style="yellow")
+    console.print("[bold blue]Listing vulnerabilities...[/bold blue]\n")
 
-    # Sample data (to be replaced with actual database query)
-    table.add_row("CVE-2024-0001", "Critical", "New", "2024-01-15")
-    table.add_row("CVE-2024-0002", "High", "Remediated", "2024-01-14")
+    try:
+        db = next(get_db())
+        query = db.query(Vulnerability)
 
-    console.print(table)
+        # Filter by severity
+        if severity != "all":
+            query = query.filter(Vulnerability.severity == severity)
+
+        # Filter by status
+        if status != "all":
+            query = query.filter(Vulnerability.status == status)
+
+        vulns = query.order_by(Vulnerability.discovered_at.desc()).limit(limit).all()
+
+        if not vulns:
+            console.print("[yellow]No vulnerabilities found in database[/yellow]")
+            console.print("[dim]Use 'vulnzero generate-patch CVE-ID --save-db' to add vulnerabilities[/dim]")
+            return
+
+        table = Table(title=f"Vulnerabilities (showing {len(vulns)})")
+        table.add_column("CVE ID", style="cyan")
+        table.add_column("Severity", style="magenta")
+        table.add_column("CVSS", style="yellow")
+        table.add_column("Status", style="green")
+        table.add_column("Patches", style="blue")
+
+        for vuln in vulns:
+            severity_emoji = {
+                "critical": "🔴",
+                "high": "🟠",
+                "medium": "🟡",
+                "low": "🟢",
+            }.get(vuln.severity, "⚪")
+
+            table.add_row(
+                vuln.cve_id,
+                f"{severity_emoji} {vuln.severity.upper()}",
+                f"{vuln.cvss_score:.1f}" if vuln.cvss_score else "N/A",
+                vuln.status,
+                str(len(vuln.patches)),
+            )
+
+        console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error: {e}")
 
 
 @main.command()
@@ -169,21 +232,212 @@ def register_asset(asset_hostname: str, os_type: str, os_version: str, ip_addres
 @main.command()
 def stats() -> None:
     """Show VulnZero statistics and dashboard."""
+    from vulnzero.services.patch_generator.storage import PatchStorageService
+    from vulnzero.shared.models import Vulnerability, get_db
+
     console.print("[bold cyan]VulnZero Statistics[/bold cyan]\n")
 
-    # TODO: Query real statistics from database
-    stats_table = Table(show_header=False, box=None)
-    stats_table.add_column("Metric", style="bold")
-    stats_table.add_column("Value", style="green")
+    try:
+        db = next(get_db())
+        storage = PatchStorageService(db)
 
-    stats_table.add_row("Total Vulnerabilities", "0")
-    stats_table.add_row("Critical", "0")
-    stats_table.add_row("High", "0")
-    stats_table.add_row("Remediated (Last 7 Days)", "0")
-    stats_table.add_row("Assets Monitored", "0")
-    stats_table.add_row("Success Rate", "N/A")
+        # Get vulnerability counts
+        total_vulns = db.query(Vulnerability).count()
+        critical = db.query(Vulnerability).filter(Vulnerability.severity == "critical").count()
+        high = db.query(Vulnerability).filter(Vulnerability.severity == "high").count()
+        medium = db.query(Vulnerability).filter(Vulnerability.severity == "medium").count()
 
-    console.print(stats_table)
+        # Get patch statistics
+        patch_stats = storage.get_statistics()
+
+        stats_table = Table(show_header=False, box=None)
+        stats_table.add_column("Metric", style="bold")
+        stats_table.add_column("Value", style="green")
+
+        stats_table.add_row("Total Vulnerabilities", str(total_vulns))
+        stats_table.add_row("  Critical", f"🔴 {critical}")
+        stats_table.add_row("  High", f"🟠 {high}")
+        stats_table.add_row("  Medium", f"🟡 {medium}")
+        stats_table.add_row("", "")
+        stats_table.add_row("Total Patches Generated", str(patch_stats["total_patches"]))
+        stats_table.add_row("  Approved", f"✓ {patch_stats['approved']}")
+        stats_table.add_row("  Pending Review", f"⏳ {patch_stats['pending_review']}")
+        stats_table.add_row("  Rejected", f"✗ {patch_stats['rejected']}")
+        stats_table.add_row("", "")
+        stats_table.add_row(
+            "Average Confidence", f"{patch_stats['average_confidence']:.1%}"
+        )
+        stats_table.add_row("Approval Rate", f"{patch_stats['approval_rate']:.1%}")
+
+        console.print(stats_table)
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error: {e}")
+        console.print("[dim]Make sure database is initialized: vulnzero init[/dim]")
+
+
+@main.command()
+@click.option("--status", type=click.Choice(["all", "pending", "approved", "rejected"]), default="all")
+@click.option("--limit", default=20, help="Number of patches to display")
+def list_patches(status: str, limit: int) -> None:
+    """List generated patches."""
+    from vulnzero.services.patch_generator.storage import PatchStorageService
+    from vulnzero.shared.models import Patch, PatchStatus, get_db
+
+    console.print("[bold blue]Listing patches...[/bold blue]\n")
+
+    try:
+        db = next(get_db())
+        storage = PatchStorageService(db)
+
+        if status == "all":
+            patches = storage.get_recent_patches(limit)
+        elif status == "pending":
+            patches = storage.get_patches_by_status(PatchStatus.GENERATED, limit)
+        elif status == "approved":
+            patches = storage.get_patches_by_status(PatchStatus.APPROVED, limit)
+        elif status == "rejected":
+            patches = storage.get_patches_by_status(PatchStatus.REJECTED, limit)
+
+        if not patches:
+            console.print("[yellow]No patches found[/yellow]")
+            return
+
+        table = Table(title=f"Patches (showing {len(patches)})")
+        table.add_column("Patch ID", style="cyan")
+        table.add_column("CVE", style="yellow")
+        table.add_column("Status", style="green")
+        table.add_column("Confidence", style="magenta")
+        table.add_column("Created", style="dim")
+
+        for patch in patches:
+            status_icon = {
+                "generated": "⏳",
+                "approved": "✓",
+                "rejected": "✗",
+                "test_passed": "🧪",
+            }.get(patch.status, "")
+
+            table.add_row(
+                patch.patch_id,
+                patch.vulnerability.cve_id if patch.vulnerability else "N/A",
+                f"{status_icon} {patch.status}",
+                f"{patch.confidence_score:.0%}",
+                patch.created_at.strftime("%Y-%m-%d %H:%M"),
+            )
+
+        console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error: {e}")
+
+
+@main.command()
+@click.argument("patch_id")
+def view_patch(patch_id: str) -> None:
+    """
+    View detailed information about a patch.
+
+    Example: vulnzero view-patch patch_abc123
+    """
+    from rich.panel import Panel
+    from rich.syntax import Syntax
+
+    from vulnzero.services.patch_generator.storage import PatchStorageService
+    from vulnzero.shared.models import get_db
+
+    try:
+        db = next(get_db())
+        storage = PatchStorageService(db)
+        patch = storage.get_patch_by_id(patch_id)
+
+        if not patch:
+            console.print(f"[red]✗[/red] Patch {patch_id} not found")
+            return
+
+        # Display patch information
+        console.print(
+            Panel(
+                f"[bold]Patch ID:[/bold] {patch.patch_id}\n"
+                f"[bold]CVE:[/bold] {patch.vulnerability.cve_id if patch.vulnerability else 'N/A'}\n"
+                f"[bold]Status:[/bold] {patch.status}\n"
+                f"[bold]Confidence:[/bold] {patch.confidence_score:.2%}\n"
+                f"[bold]LLM Model:[/bold] {patch.llm_model or 'N/A'}\n"
+                f"[bold]Created:[/bold] {patch.created_at.strftime('%Y-%m-%d %H:%M:%S')}",
+                title="[bold cyan]Patch Information[/bold cyan]",
+            )
+        )
+
+        # Display patch content
+        console.print("\n[bold cyan]Patch Script:[/bold cyan]")
+        syntax = Syntax(patch.patch_content, "bash", theme="monokai", line_numbers=True)
+        console.print(syntax)
+
+        # Display rollback script if available
+        if patch.rollback_script:
+            console.print("\n[bold yellow]Rollback Script:[/bold yellow]")
+            rollback_syntax = Syntax(
+                patch.rollback_script, "bash", theme="monokai", line_numbers=True
+            )
+            console.print(rollback_syntax)
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error: {e}")
+
+
+@main.command()
+@click.argument("patch_id")
+@click.option("--approver", default="cli-user", help="Name of approver")
+def approve_patch(patch_id: str, approver: str) -> None:
+    """
+    Approve a patch for deployment.
+
+    Example: vulnzero approve-patch patch_abc123 --approver john.doe
+    """
+    from vulnzero.services.patch_generator.storage import PatchStorageService
+    from vulnzero.shared.models import get_db
+
+    try:
+        db = next(get_db())
+        storage = PatchStorageService(db)
+        patch = storage.approve_patch(patch_id, approver)
+
+        console.print(f"[green]✓[/green] Patch {patch_id} approved by {approver}")
+        console.print(f"  Status: {patch.status}")
+        console.print(f"  Approved at: {patch.approved_at}")
+
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error: {e}")
+
+
+@main.command()
+@click.argument("patch_id")
+@click.option("--reason", prompt=True, help="Reason for rejection")
+@click.option("--rejector", default="cli-user", help="Name of rejector")
+def reject_patch(patch_id: str, reason: str, rejector: str) -> None:
+    """
+    Reject a patch.
+
+    Example: vulnzero reject-patch patch_abc123 --reason "Safety concerns"
+    """
+    from vulnzero.services.patch_generator.storage import PatchStorageService
+    from vulnzero.shared.models import get_db
+
+    try:
+        db = next(get_db())
+        storage = PatchStorageService(db)
+        patch = storage.reject_patch(patch_id, rejector, reason)
+
+        console.print(f"[yellow]✗[/yellow] Patch {patch_id} rejected by {rejector}")
+        console.print(f"  Reason: {reason}")
+        console.print(f"  Status: {patch.status}")
+
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error: {e}")
 
 
 @main.command()
@@ -198,6 +452,7 @@ def test_patch(patch_id: str) -> None:
 
     # TODO: Implement digital twin testing
     console.print("[yellow]⚠[/yellow] Digital twin testing not yet implemented")
+    console.print("[dim]This will spin up Docker containers to test patches safely[/dim]")
 
 
 @main.command()
