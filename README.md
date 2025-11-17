@@ -53,7 +53,7 @@ VulnZero is built as a microservices platform with the following core components
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/vulnzero-engine.git
+git clone https://github.com/oness24/vulnzero-engine.git
 cd vulnzero-engine
 ```
 
@@ -169,9 +169,9 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 ## 🙋 Support
 
 - **Documentation**: See `claude.md` for comprehensive guides
-- **Issues**: Report bugs via [GitHub Issues](https://github.com/yourusername/vulnzero-engine/issues)
-- **Email**: support@vulnzero.io
-- **Website**: https://vulnzero.io
+- **Issues**: Report bugs via [GitHub Issues](https://github.com/oness24/vulnzero-engine/issues)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/oness24/vulnzero-engine/discussions)
+- **Security**: Report vulnerabilities to security@vulnzero.io (see SECURITY.md)
 
 ## 🏆 Built By
 

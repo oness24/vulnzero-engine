@@ -1,0 +1,260 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: vulnzero-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vulnzero_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-vulnzero}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vulnzero_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vulnzero-network
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: vulnzero-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vulnzero-network
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vulnzero-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - api-gateway
+    networks:
+      - vulnzero-network
+    profiles:
+      - monitoring
+
+  # Grafana Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vulnzero-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-change_me_in_production}
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - vulnzero-network
+    profiles:
+      - monitoring
+
+  # API Gateway (FastAPI)
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+      target: development
+    container_name: vulnzero-api
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-vulnzero_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-vulnzero}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-}@redis:6379/1
+      - APP_ENV=${APP_ENV:-development}
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./services:/app/services:ro
+      - ./shared:/app/shared:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vulnzero-network
+    command: uvicorn services.api_gateway.main:app --host 0.0.0.0 --port 8000 --reload
+    profiles:
+      - api
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+      target: development
+    container_name: vulnzero-celery-worker
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-vulnzero_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-vulnzero}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-}@redis:6379/1
+      - APP_ENV=${APP_ENV:-development}
+    volumes:
+      - ./services:/app/services:ro
+      - ./shared:/app/shared:ro
+      - /var/run/docker.sock:/var/run/docker.sock  # For Digital Twin testing
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vulnzero-network
+    command: celery -A services.api_gateway.celery_app worker --loglevel=info
+    profiles:
+      - api
+
+  # Celery Beat (Scheduler)
+  celery-beat:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+      target: development
+    container_name: vulnzero-celery-beat
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-vulnzero_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-vulnzero}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-}@redis:6379/1
+    volumes:
+      - ./services:/app/services:ro
+      - ./shared:/app/shared:ro
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - vulnzero-network
+    command: celery -A services.api_gateway.celery_app beat --loglevel=info
+    profiles:
+      - api
+
+  # Web Dashboard (React)
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: development
+    container_name: vulnzero-web
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_WS_URL=ws://localhost:8000
+      - REACT_APP_ENV=development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web/src:/app/src:ro
+      - ./web/public:/app/public:ro
+    depends_on:
+      - api-gateway
+    networks:
+      - vulnzero-network
+    profiles:
+      - web
+
+  # PgAdmin (Database Management UI)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: vulnzero-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@vulnzero.io}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-change_me_in_production}
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - vulnzero-network
+    profiles:
+      - tools
+
+  # Redis Commander (Redis Management UI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: vulnzero-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0:${REDIS_PASSWORD:-}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - vulnzero-network
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  vulnzero-network:
+    driver: bridge
+
+# Usage:
+# Start core services (postgres, redis):
+#   docker-compose up -d
+#
+# Start with API:
+#   docker-compose --profile api up -d
+#
+# Start with web dashboard:
+#   docker-compose --profile api --profile web up -d
+#
+# Start with monitoring:
+#   docker-compose --profile api --profile monitoring up -d
+#
+# Start everything:
+#   docker-compose --profile api --profile web --profile monitoring --profile tools up -d
+#
+# View logs:
+#   docker-compose logs -f [service-name]
+#
+# Stop all services:
+#   docker-compose down
+#
+# Remove all data:
+#   docker-compose down -v
