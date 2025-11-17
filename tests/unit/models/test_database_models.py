@@ -40,11 +40,11 @@ class TestVulnerabilityModel:
         assert vuln.cve_id == "CVE-2024-99999"
         assert vuln.created_at is not None
 
-    def test_vulnerability_unique_cve_id(self, test_db):
-        """Test CVE ID uniqueness constraint"""
+    def test_vulnerability_duplicate_cve_id_allowed(self, test_db):
+        """Test that duplicate CVE IDs are allowed (same CVE can affect multiple assets)"""
         vuln1 = Vulnerability(
-            cve_id="CVE-2024-UNIQUE",
-            title="Test 1",
+            cve_id="CVE-2024-DUPLICATE",
+            title="Test 1 - Server A",
             severity="high",
             cvss_score=7.0,
             discovered_at=datetime.utcnow(),
@@ -53,19 +53,20 @@ class TestVulnerabilityModel:
         test_db.add(vuln1)
         test_db.commit()
 
-        # Try to create duplicate
+        # Create another vulnerability with same CVE (e.g., on different asset)
         vuln2 = Vulnerability(
-            cve_id="CVE-2024-UNIQUE",  # Duplicate
-            title="Test 2",
+            cve_id="CVE-2024-DUPLICATE",  # Same CVE, different instance
+            title="Test 2 - Server B",
             severity="medium",
             cvss_score=5.0,
             discovered_at=datetime.utcnow(),
             scanner_source="test"
         )
         test_db.add(vuln2)
+        test_db.commit()  # Should NOT raise IntegrityError
 
-        with pytest.raises(IntegrityError):
-            test_db.commit()
+        # Verify both exist
+        assert test_db.query(Vulnerability).filter_by(cve_id="CVE-2024-DUPLICATE").count() == 2
 
     def test_vulnerability_status_enum(self, test_db):
         """Test vulnerability status enum"""

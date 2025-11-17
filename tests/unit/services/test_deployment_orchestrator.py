@@ -37,8 +37,8 @@ class TestRollingDeployment:
         result = strategy.execute(assets)
 
         assert result.success is True
-        assert result.successful_assets == len(assets)
-        assert result.failed_assets == 0
+        assert len(result.assets_deployed) == len(assets)
+        assert len(result.assets_failed) == 0
 
     @patch('services.deployment_orchestrator.ansible.executor.AnsibleExecutor')
     def test_rolling_deployment_partial_failure(self, mock_executor, sample_patch, sample_asset):
@@ -64,7 +64,7 @@ class TestRollingDeployment:
         result = strategy.execute(assets)
 
         # Should complete despite one failure
-        assert result.successful_assets >= 1
+        assert len(result.assets_deployed) >= 1
 
     def test_rolling_deployment_batch_calculation(self, sample_patch):
         """Test batch size calculation"""
@@ -171,7 +171,7 @@ class TestAllAtOnceDeployment:
         result = strategy.execute(assets)
 
         assert result.success is True
-        assert result.successful_assets == 5
+        assert len(result.assets_deployed) == 5
 
     @patch('services.deployment_orchestrator.ansible.executor.AnsibleExecutor')
     def test_all_at_once_with_failures(self, mock_executor, sample_patch):
@@ -188,8 +188,8 @@ class TestAllAtOnceDeployment:
         strategy = AllAtOnceDeployment(patch=sample_patch)
         result = strategy.execute(assets)
 
-        assert result.successful_assets == 2
-        assert result.failed_assets == 1
+        assert len(result.assets_deployed) == 2
+        assert len(result.assets_failed) == 1
 
 
 class TestPreDeployValidator:

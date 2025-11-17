@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from services.monitoring.detectors.anomaly_detector import Anomaly, AnomalySeverity
 from services.monitoring.alerts.alert_manager import AlertManager, AlertSeverity
-from shared.models import Deployment, DeploymentStatus, AuditLog, AuditAction
+from shared.models import Deployment, DeploymentStatus, AuditLog, AuditAction, AuditResourceType
 
 logger = logging.getLogger(__name__)
 
@@ -207,10 +207,17 @@ class RollbackEngine:
 
                 # Create audit log
                 audit_log = AuditLog(
-                    user_id=user_id,
                     action=AuditAction.DEPLOYMENT_ROLLBACK_COMPLETED,
-                    resource_type="deployment",
-                    resource_id=deployment_id,
+                    timestamp=datetime.utcnow(),
+                    actor_type="system" if not manual else "user",
+                    actor_id=user_id or "rollback_engine",
+                    actor_name="RollbackEngine",
+                    actor_ip="internal",
+                    actor_user_agent="RollbackEngine",
+                    resource_type=AuditResourceType.DEPLOYMENT,
+                    resource_id=str(deployment_id),
+                    description=f"Rollback completed for deployment {deployment_id} ({'manual' if manual else 'automatic'})",
+                    success=1,
                     details={
                         "trigger": "manual" if manual else "automatic",
                         "anomaly_count": len(anomalies),
@@ -223,9 +230,7 @@ class RollbackEngine:
                             }
                             for a in anomalies
                         ]
-                    },
-                    ip_address="internal",
-                    user_agent="RollbackEngine"
+                    }
                 )
                 self.db.add(audit_log)
                 self.db.commit()
@@ -235,13 +240,19 @@ class RollbackEngine:
 
                 # Create failure audit log
                 audit_log = AuditLog(
-                    user_id=user_id,
                     action=AuditAction.DEPLOYMENT_ROLLBACK_FAILED,
-                    resource_type="deployment",
-                    resource_id=deployment_id,
-                    details={"error": "Rollback execution failed"},
-                    ip_address="internal",
-                    user_agent="RollbackEngine"
+                    timestamp=datetime.utcnow(),
+                    actor_type="system" if not manual else "user",
+                    actor_id=user_id or "rollback_engine",
+                    actor_name="RollbackEngine",
+                    actor_ip="internal",
+                    actor_user_agent="RollbackEngine",
+                    resource_type=AuditResourceType.DEPLOYMENT,
+                    resource_id=str(deployment_id),
+                    description=f"Rollback failed for deployment {deployment_id}",
+                    success=0,
+                    error_message="Rollback execution failed",
+                    details={"error": "Rollback execution failed"}
                 )
                 self.db.add(audit_log)
                 self.db.commit()
@@ -256,13 +267,19 @@ class RollbackEngine:
 
             # Create error audit log
             audit_log = AuditLog(
-                user_id=user_id,
                 action=AuditAction.DEPLOYMENT_ROLLBACK_FAILED,
-                resource_type="deployment",
-                resource_id=deployment_id,
-                details={"error": str(e)},
-                ip_address="internal",
-                user_agent="RollbackEngine"
+                timestamp=datetime.utcnow(),
+                actor_type="system" if not manual else "user",
+                actor_id=user_id or "rollback_engine",
+                actor_name="RollbackEngine",
+                actor_ip="internal",
+                actor_user_agent="RollbackEngine",
+                resource_type=AuditResourceType.DEPLOYMENT,
+                resource_id=str(deployment_id),
+                description=f"Rollback error for deployment {deployment_id}",
+                success=0,
+                error_message=str(e),
+                details={"error": str(e)}
             )
             self.db.add(audit_log)
             self.db.commit()

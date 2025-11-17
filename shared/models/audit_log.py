@@ -34,6 +34,8 @@ class AuditAction(str, enum.Enum):
     DEPLOYMENT_COMPLETED = "deployment_completed"
     DEPLOYMENT_FAILED = "deployment_failed"
     DEPLOYMENT_ROLLED_BACK = "deployment_rolled_back"
+    DEPLOYMENT_ROLLBACK_COMPLETED = "deployment_rollback_completed"
+    DEPLOYMENT_ROLLBACK_FAILED = "deployment_rollback_failed"
     DEPLOYMENT_CANCELLED = "deployment_cancelled"
 
     # Asset actions

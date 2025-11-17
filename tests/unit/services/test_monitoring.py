@@ -15,6 +15,7 @@ from services.monitoring.detectors.anomaly_detector import (
     AnomalySeverity
 )
 from services.monitoring.rollback.rollback_engine import RollbackEngine
+from shared.models import DeploymentStatus
 
 
 class TestMetricsCollector:
@@ -335,6 +336,10 @@ class TestRollbackEngine:
         """Test checking rollback eligibility"""
         # Add rollback script to patch
         sample_patch.rollback_script = "#!/bin/bash\necho 'rollback'"
+
+        # Set deployment to a started status (not PENDING)
+        sample_deployment.status = DeploymentStatus.DEPLOYING
+        sample_deployment.started_at = datetime.utcnow()
         test_db.commit()
 
         engine = RollbackEngine(test_db)
@@ -439,6 +444,15 @@ class TestPrometheusExporter:
     def test_export_all_metrics(self, test_db):
         """Test exporting all metrics"""
         from services.monitoring.prometheus.exporter import MetricsExporter
+        from prometheus_client import REGISTRY
+
+        # Clear any existing collectors to avoid "already registered" errors
+        collectors = list(REGISTRY._collector_to_names.keys())
+        for collector in collectors:
+            try:
+                REGISTRY.unregister(collector)
+            except Exception:
+                pass
 
         exporter = MetricsExporter(test_db)
         exporter.export_all_metrics()
@@ -451,6 +465,15 @@ class TestPrometheusExporter:
         """Test exporting system metrics"""
         from services.monitoring.prometheus.exporter import MetricsExporter
         from services.monitoring.collectors.metrics_collector import Metric, MetricType
+        from prometheus_client import REGISTRY
+
+        # Clear any existing collectors to avoid "already registered" errors
+        collectors = list(REGISTRY._collector_to_names.keys())
+        for collector in collectors:
+            try:
+                REGISTRY.unregister(collector)
+            except Exception:
+                pass
 
         mock_cpu.return_value = 50.0
 
