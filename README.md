@@ -162,13 +162,6 @@ We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTIN
 - [ ] Integration marketplace
 - [ ] Custom workflow automation
 
-## 💼 Business Model
-
-VulnZero offers consumption-based pricing:
-- **Pay-per-remediation**: $10-100 per vulnerability successfully remediated
-- **Platform subscription**: Base fee + per-remediation pricing
-- **Enterprise**: Custom pricing for high-volume customers
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
