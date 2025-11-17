@@ -27,6 +27,7 @@ class TestVulnerabilityModel:
             severity="high",
             cvss_score=8.5,
             status=VulnerabilityStatus.NEW,
+            discovered_at=datetime.utcnow(),
             affected_package="test-pkg",
             scanner_source="test"
         )
@@ -46,6 +47,7 @@ class TestVulnerabilityModel:
             title="Test 1",
             severity="high",
             cvss_score=7.0,
+            discovered_at=datetime.utcnow(),
             scanner_source="test"
         )
         test_db.add(vuln1)
@@ -57,6 +59,7 @@ class TestVulnerabilityModel:
             title="Test 2",
             severity="medium",
             cvss_score=5.0,
+            discovered_at=datetime.utcnow(),
             scanner_source="test"
         )
         test_db.add(vuln2)
@@ -72,6 +75,7 @@ class TestVulnerabilityModel:
             severity="high",
             cvss_score=7.0,
             status=VulnerabilityStatus.NEW,
+            discovered_at=datetime.utcnow(),
             scanner_source="test"
         )
         test_db.add(vuln)
@@ -92,6 +96,8 @@ class TestAssetModel:
     def test_create_asset(self, test_db):
         """Test creating an asset"""
         asset = Asset(
+            asset_id="asset-test-001",
+            name="Test Host",
             hostname="test-host",
             ip_address="10.0.0.1",
             type=AssetType.SERVER,
@@ -111,6 +117,8 @@ class TestAssetModel:
     def test_asset_unique_hostname(self, test_db):
         """Test hostname uniqueness constraint"""
         asset1 = Asset(
+            asset_id="asset-unique-001",
+            name="Unique Host 1",
             hostname="unique-host",
             type=AssetType.SERVER,
             status=AssetStatus.ACTIVE
@@ -118,9 +126,11 @@ class TestAssetModel:
         test_db.add(asset1)
         test_db.commit()
 
-        # Try to create duplicate
+        # Try to create duplicate (hostname may not be unique in schema)
         asset2 = Asset(
-            hostname="unique-host",  # Duplicate
+            asset_id="asset-unique-002",  # Different asset_id
+            name="Unique Host 2",
+            hostname="unique-host",  # Same hostname
             type=AssetType.SERVER,
             status=AssetStatus.ACTIVE
         )
@@ -138,6 +148,8 @@ class TestAssetModel:
         }
 
         asset = Asset(
+            asset_id="asset-meta-001",
+            name="Meta Host",
             hostname="meta-host",
             type=AssetType.SERVER,
             status=AssetStatus.ACTIVE,

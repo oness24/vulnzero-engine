@@ -95,6 +95,8 @@ def sample_vulnerability(test_db: Session) -> Vulnerability:
 def sample_asset(test_db: Session) -> Asset:
     """Create a sample asset"""
     asset = Asset(
+        asset_id="asset-fixture-001",
+        name="Test Server 01",
         hostname="test-server-01",
         ip_address="192.168.1.100",
         type=AssetType.SERVER,

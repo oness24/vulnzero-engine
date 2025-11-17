@@ -5,6 +5,7 @@ Tests complete workflows across multiple services.
 """
 
 import pytest
+from datetime import datetime
 from unittest.mock import patch, Mock
 
 
@@ -162,6 +163,7 @@ class TestAPIWorkflows:
             title="CRUD Test",
             severity="medium",
             cvss_score=5.5,
+            discovered_at=datetime.utcnow(),
             scanner_source="test"
         )
         test_db.add(vuln)
