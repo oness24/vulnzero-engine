@@ -72,6 +72,14 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
     jwt_expiration_minutes: int = Field(default=30, description="JWT token expiration in minutes")
 
+    # API Authentication
+    api_keys: list[str] = Field(
+        default_factory=list, description="List of valid API keys for authentication"
+    )
+    require_auth_in_dev: bool = Field(
+        default=False, description="Require API key authentication in development mode"
+    )
+
     # Docker
     docker_host: str = Field(
         default="unix:///var/run/docker.sock", description="Docker daemon socket"
