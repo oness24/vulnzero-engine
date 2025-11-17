@@ -1,0 +1,422 @@
+# ============================================================================
+# VulnZero .gitignore
+# ============================================================================
+
+# ============================================================================
+# Python
+# ============================================================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# ============================================================================
+# IDEs and Editors
+# ============================================================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Eclipse
+.project
+.pydevproject
+.settings/
+
+# NetBeans
+nbproject/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# ============================================================================
+# Operating System
+# ============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================================
+# Docker
+# ============================================================================
+docker-compose.override.yml
+*.dockerfile.swp
+
+# ============================================================================
+# Database
+# ============================================================================
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+pgdata/
+postgres_data/
+
+# ============================================================================
+# Logs
+# ============================================================================
+logs/
+*.log
+log/
+*.log.*
+
+# ============================================================================
+# Secrets & Credentials (NEVER COMMIT THESE!)
+# ============================================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+secrets/
+credentials/
+*.credentials
+.secrets/
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# AWS
+.aws/
+aws-credentials
+
+# GCP
+gcp-credentials.json
+service-account.json
+
+# Azure
+azure-credentials.json
+
+# ============================================================================
+# VulnZero Specific
+# ============================================================================
+# Patch artifacts
+patches/generated/*.sh
+patches/tested/
+patches/deployed/
+
+# Digital Twin artifacts
+digital-twins/
+test-containers/
+sandbox-environments/
+
+# Scanner data cache
+scanner-cache/
+vulnerability-cache/
+
+# ML Models
+models/*.pkl
+models/*.h5
+models/*.pt
+models/*.onnx
+models/trained/
+models/checkpoints/
+
+# Ansible
+*.retry
+ansible-playbooks/generated/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+terraform.rc
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+.cache/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Reports
+reports/
+audit-reports/
+compliance-reports/
+*.pdf
+*.csv
+*.xlsx
+
+# ============================================================================
+# Node.js (for web dashboard)
+# ============================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+dist/
+dist-ssr/
+*.local
+
+# ============================================================================
+# Build artifacts
+# ============================================================================
+*.o
+*.a
+*.lib
+*.dll
+*.exe
+*.out
+*.app
+
+# ============================================================================
+# Monitoring & Metrics
+# ============================================================================
+prometheus_data/
+grafana_data/
+metrics/
+monitoring/data/
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+# Backups
+backups/
+*.backup
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Large files
+*.iso
+*.dmg
+*.pkg
+
+# Generated files
+generated/
+auto-generated/
+
+# Documentation builds
+docs/build/
+docs/_build/
+docs/.doctrees/
+
+# Pytest
+.pytest_cache/
+test-results/
+test-reports/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+
+# Profiling
+*.prof
+*.lprof
+
+# Benchmarks
+benchmark-results/
+
+# Lock files (optional - uncomment if you want to ignore)
+# requirements-lock.txt
+# package-lock.json
+# yarn.lock
+
+# Personal notes
+NOTES.md
+TODO.md
+PERSONAL.md
+scratch/
+
+# Experiments
+experiments/
+playground/
