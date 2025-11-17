@@ -1,0 +1,142 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Docker
+docker-compose.override.yml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+
+# Kubernetes
+*.kubeconfig
+
+# Ansible
+*.retry
+.ansible/
+
+# Secrets & Keys
+*.pem
+*.key
+*.crt
+secrets/
+keys/
+
+# Artifacts & Temp Files
+tmp/
+temp/
+*.tmp
+artifacts/
+.cache/
+
+# OS
+Thumbs.db
+.DS_Store
+*.swp
+
+# Node.js (for web dashboard)
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+.pnp.*
+.yarn/
+
+# Build outputs
+dist/
+build/
+out/
+
+# Monitoring
+prometheus_multiproc/
+
+# Backup files
+*.bak
+*.backup
+
+# Large files
+*.tar.gz
+*.zip
+*.rar
+
+# Local development
+local/
+.local/
+
+# Generated documentation
+docs/_build/
+site/

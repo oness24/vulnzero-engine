@@ -1,0 +1,298 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: vulnzero-postgres
+    environment:
+      POSTGRES_DB: vulnzero
+      POSTGRES_USER: vulnzero
+      POSTGRES_PASSWORD: vulnzero_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vulnzero"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vulnzero-network
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: vulnzero-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vulnzero-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: vulnzero-api-gateway
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/api-gateway:/app/services/api-gateway
+      - ./shared:/app/shared
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Vulnerability Aggregator Service
+  aggregator:
+    build:
+      context: .
+      dockerfile: services/aggregator/Dockerfile
+    container_name: vulnzero-aggregator
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/aggregator:/app/services/aggregator
+      - ./shared:/app/shared
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # AI Patch Generator Service
+  patch-generator:
+    build:
+      context: .
+      dockerfile: services/patch-generator/Dockerfile
+    container_name: vulnzero-patch-generator
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/patch-generator:/app/services/patch-generator
+      - ./shared:/app/shared
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Digital Twin Testing Engine
+  testing-engine:
+    build:
+      context: .
+      dockerfile: services/testing-engine/Dockerfile
+    container_name: vulnzero-testing-engine
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/testing-engine:/app/services/testing-engine
+      - ./shared:/app/shared
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Deployment Orchestrator
+  deployment-engine:
+    build:
+      context: .
+      dockerfile: services/deployment-engine/Dockerfile
+    container_name: vulnzero-deployment-engine
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/deployment-engine:/app/services/deployment-engine
+      - ./shared:/app/shared
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Monitoring Service
+  monitoring:
+    build:
+      context: .
+      dockerfile: services/monitoring/Dockerfile
+    container_name: vulnzero-monitoring
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/monitoring:/app/services/monitoring
+      - ./shared:/app/shared
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/celery-worker.Dockerfile
+    container_name: vulnzero-celery-worker
+    command: celery -A shared.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services:/app/services
+      - ./shared:/app/shared
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Celery Beat (Scheduler)
+  celery-beat:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/celery-worker.Dockerfile
+    container_name: vulnzero-celery-beat
+    command: celery -A shared.celery_app beat --loglevel=info
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services:/app/services
+      - ./shared:/app/shared
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Flower (Celery Monitoring)
+  flower:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/celery-worker.Dockerfile
+    container_name: vulnzero-flower
+    command: celery -A shared.celery_app flower --port=5555
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vulnzero-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vulnzero-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=redis-datasource
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  vulnzero-network:
+    driver: bridge
