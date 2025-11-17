@@ -7,7 +7,7 @@ Tests AI patch generation, validation, and LLM integration.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from services.patch_generator.generators.patch_generator import PatchGenerator
+from services.patch_generator.generators.patch_generator import AIPatchGenerator as PatchGenerator
 from services.patch_generator.validators.patch_validator import PatchValidator
 from services.patch_generator.llm.factory import get_llm_client
 

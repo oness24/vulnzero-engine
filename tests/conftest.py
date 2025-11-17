@@ -6,6 +6,8 @@ Shared fixtures for VulnZero test suite.
 
 import pytest
 import os
+import sys
+import importlib.util
 from datetime import datetime, timedelta
 from typing import Generator
 from unittest.mock import Mock, MagicMock, patch
@@ -13,6 +15,8 @@ from unittest.mock import Mock, MagicMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
+
+
 from fastapi.testclient import TestClient
 
 # Import models and config
