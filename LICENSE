@@ -1,0 +1,47 @@
+MIT License
+
+Copyright (c) 2024 VulnZero
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+DISCLAIMER AND LIMITATION OF LIABILITY:
+
+THIS SOFTWARE IS PROVIDED FOR VULNERABILITY REMEDIATION PURPOSES. THE AUTHORS
+AND COPYRIGHT HOLDERS EXPRESSLY DISCLAIM ANY AND ALL LIABILITY FOR DAMAGES
+RESULTING FROM THE USE OF THIS SOFTWARE, INCLUDING BUT NOT LIMITED TO:
+
+- System downtime or service interruptions
+- Data loss or corruption
+- Security breaches or vulnerabilities introduced by patches
+- Production system failures
+- Business interruption or financial losses
+
+USERS OF THIS SOFTWARE ASSUME ALL RISKS ASSOCIATED WITH AUTOMATED PATCH
+DEPLOYMENT. IT IS STRONGLY RECOMMENDED TO:
+
+1. Test all patches in non-production environments first
+2. Maintain current backups before deploying any patches
+3. Have rollback procedures in place
+4. Monitor systems closely after patch deployment
+5. Review and approve patches before deployment to critical systems
+
+THIS SOFTWARE SHOULD NOT BE USED ON PRODUCTION SYSTEMS WITHOUT PROPER TESTING,
+HUMAN OVERSIGHT, AND APPROVAL WORKFLOWS IN PLACE.

@@ -1,8 +1,10 @@
 # VulnZero
 
+> ⚠️ **PROJECT STATUS:** Currently in planning/early development phase. Not production-ready.
+
 **Zero-Touch Vulnerability Remediation. Zero Days of Exposure.**
 
-VulnZero is the world's first fully autonomous vulnerability remediation platform that detects, patches, tests, deploys, and validates fixes across entire infrastructure without human intervention.
+VulnZero is an autonomous vulnerability remediation platform (in development) that aims to detect, patch, test, deploy, and validate fixes across entire infrastructure with minimal human intervention.
 
 ## 🎯 Overview
 
@@ -53,28 +55,21 @@ VulnZero is built as a microservices platform with the following core components
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/vulnzero-engine.git
+git clone https://github.com/oness24/vulnzero-engine.git
 cd vulnzero-engine
 ```
 
-2. **Set up environment variables**
+2. **Set up environment variables** *(Coming soon)*
 ```bash
-cp .env.example .env
-# Edit .env with your configuration
+# Setup instructions will be added once implementation begins
 ```
 
-3. **Start services with Docker Compose**
-```bash
-docker-compose up -d
-```
+3. **Installation instructions**
+- ⏳ Docker Compose configuration in development
+- ⏳ Database setup guide coming soon
+- ⏳ Development environment setup pending
 
-4. **Run database migrations**
-```bash
-make migrate
-```
-
-5. **Access the dashboard**
-Open your browser to `http://localhost:3000`
+**Note:** Full installation instructions will be available after Phase 1.1 (Foundation Setup) is complete.
 
 ## 📊 How It Works
 
@@ -131,13 +126,9 @@ VulnZero takes security seriously:
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTING.md) for details.
+Contributions are welcome once the core implementation is complete. Contributing guidelines will be added soon.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+**Current Status:** Project in early development - check back soon for contribution opportunities.
 
 ## 📈 Roadmap
 
@@ -168,10 +159,9 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 
 ## 🙋 Support
 
-- **Documentation**: See `claude.md` for comprehensive guides
-- **Issues**: Report bugs via [GitHub Issues](https://github.com/yourusername/vulnzero-engine/issues)
-- **Email**: support@vulnzero.io
-- **Website**: https://vulnzero.io
+- **Documentation**: See `claude.md` for comprehensive implementation guides
+- **Issues**: Report bugs via [GitHub Issues](https://github.com/oness24/vulnzero-engine/issues)
+- **Project**: Early development phase - reach out via GitHub for inquiries
 
 ## 🏆 Built By
 
