@@ -4,19 +4,31 @@ SQLAlchemy ORM models for all database tables
 """
 
 from shared.models.base import Base
-from shared.models.vulnerability import Vulnerability
-from shared.models.asset import Asset
-from shared.models.patch import Patch
-from shared.models.deployment import Deployment
-from shared.models.audit_log import AuditLog
-from shared.models.remediation_job import RemediationJob
+from shared.models.vulnerability import Vulnerability, VulnerabilityStatus
+from shared.models.asset import Asset, AssetType, AssetStatus
+from shared.models.patch import Patch, PatchType, PatchStatus
+from shared.models.deployment import Deployment, DeploymentStatus
+from shared.models.audit_log import AuditLog, AuditAction, AuditResourceType
+from shared.models.remediation_job import RemediationJob, JobType, JobStatus
 
 __all__ = [
     "Base",
+    # Models
     "Vulnerability",
     "Asset",
     "Patch",
     "Deployment",
     "AuditLog",
     "RemediationJob",
+    # Enums
+    "VulnerabilityStatus",
+    "AssetType",
+    "AssetStatus",
+    "PatchType",
+    "PatchStatus",
+    "DeploymentStatus",
+    "AuditAction",
+    "AuditResourceType",
+    "JobType",
+    "JobStatus",
 ]

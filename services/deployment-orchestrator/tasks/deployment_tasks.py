@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from services.deployment_orchestrator.tasks.celery_app import celery_app
 from services.deployment_orchestrator.core.engine import DeploymentEngine
-from shared.database import get_db
+from shared.config.database import get_db
 from shared.models import (
     Patch, Asset, Deployment, DeploymentStatus,
     AuditLog, AuditAction

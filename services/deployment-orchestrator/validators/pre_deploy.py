@@ -9,7 +9,8 @@ from typing import List, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from shared.models import Asset, Patch, TestResult, TestStatus
+from shared.models import Asset, Patch
+from services.digital_twin.analyzers.result_analyzer import TestResult, TestStatus
 
 logger = logging.getLogger(__name__)
 

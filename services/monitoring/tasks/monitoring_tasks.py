@@ -16,7 +16,7 @@ from services.monitoring.detectors.anomaly_detector import AnomalyDetector, Anom
 from services.monitoring.alerts.alert_manager import AlertManager
 from services.monitoring.rollback.rollback_engine import RollbackEngine
 from services.monitoring.prometheus.exporter import MetricsExporter
-from shared.database import get_db
+from shared.config.database import get_db
 from shared.models import Deployment, Asset, AuditLog, AuditAction
 
 logger = logging.getLogger(__name__)
