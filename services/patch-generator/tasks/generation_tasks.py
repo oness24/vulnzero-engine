@@ -107,7 +107,13 @@ async def _generate_patch_async(vulnerability_id: int, llm_provider: str):
             },
             llm_provider=llm_provider,
             llm_model=patch_result.llm_model,
-            llm_tokens_used=patch_result.tokens_used,
+            metadata={
+                "llm_tokens_used": patch_result.tokens_used,
+                "analysis_confidence": patch_result.metadata.get("analysis_confidence"),
+                "patch_type": patch_result.metadata.get("patch_type"),
+                "package_manager": patch_result.metadata.get("package_manager"),
+                "complexity": patch_result.metadata.get("complexity"),
+            },
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
