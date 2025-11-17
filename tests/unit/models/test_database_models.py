@@ -84,10 +84,10 @@ class TestVulnerabilityModel:
         assert vuln.status == VulnerabilityStatus.NEW
 
         # Update status
-        vuln.status = VulnerabilityStatus.PATCHED
+        vuln.status = VulnerabilityStatus.REMEDIATED
         test_db.commit()
 
-        assert vuln.status == VulnerabilityStatus.PATCHED
+        assert vuln.status == VulnerabilityStatus.REMEDIATED
 
 
 class TestAssetModel:
@@ -114,23 +114,23 @@ class TestAssetModel:
         assert asset.hostname == "test-host"
         assert asset.status == AssetStatus.ACTIVE
 
-    def test_asset_unique_hostname(self, test_db):
-        """Test hostname uniqueness constraint"""
+    def test_asset_unique_asset_id(self, test_db):
+        """Test asset_id uniqueness constraint"""
         asset1 = Asset(
             asset_id="asset-unique-001",
             name="Unique Host 1",
-            hostname="unique-host",
+            hostname="unique-host-1",
             type=AssetType.SERVER,
             status=AssetStatus.ACTIVE
         )
         test_db.add(asset1)
         test_db.commit()
 
-        # Try to create duplicate (hostname may not be unique in schema)
+        # Try to create duplicate with same asset_id
         asset2 = Asset(
-            asset_id="asset-unique-002",  # Different asset_id
+            asset_id="asset-unique-001",  # Duplicate asset_id
             name="Unique Host 2",
-            hostname="unique-host",  # Same hostname
+            hostname="unique-host-2",  # Different hostname
             type=AssetType.SERVER,
             status=AssetStatus.ACTIVE
         )
@@ -175,9 +175,10 @@ class TestPatchModel:
             description="Test patch",
             patch_type=PatchType.SCRIPT_EXECUTION,
             patch_content="#!/bin/bash\necho 'patched'",
-            status=PatchStatus.PENDING_APPROVAL,
+            status=PatchStatus.GENERATED,
             confidence_score=85.0,
-            llm_provider="openai"
+            llm_provider="openai",
+            llm_model="gpt-4"
         )
 
         test_db.add(patch)
@@ -186,7 +187,7 @@ class TestPatchModel:
 
         assert patch.id is not None
         assert patch.vulnerability_id == sample_vulnerability.id
-        assert patch.status == PatchStatus.PENDING_APPROVAL
+        assert patch.status == PatchStatus.GENERATED
 
     def test_patch_vulnerability_relationship(self, test_db, sample_vulnerability):
         """Test relationship between Patch and Vulnerability"""
@@ -195,8 +196,10 @@ class TestPatchModel:
             title="Test patch",
             patch_type=PatchType.SCRIPT_EXECUTION,
             patch_content="test",
-            status=PatchStatus.PENDING_APPROVAL,
-            confidence_score=80.0
+            status=PatchStatus.GENERATED,
+            confidence_score=80.0,
+            llm_provider="openai",
+            llm_model="gpt-4"
         )
 
         test_db.add(patch)
@@ -214,7 +217,9 @@ class TestPatchModel:
             title="Test",
             patch_type=PatchType.SCRIPT_EXECUTION,
             patch_content="test",
-            confidence_score=95.5
+            confidence_score=95.5,
+            llm_provider="openai",
+            llm_model="gpt-4"
         )
 
         test_db.add(patch)
@@ -226,15 +231,15 @@ class TestPatchModel:
 class TestDeploymentModel:
     """Test Deployment model"""
 
-    def test_create_deployment(self, test_db, sample_patch):
+    def test_create_deployment(self, test_db, sample_patch, sample_asset):
         """Test creating a deployment"""
         deployment = Deployment(
+            deployment_id="deploy-test-001",
             patch_id=sample_patch.id,
+            asset_id=sample_asset.id,
             strategy="rolling",
-            status=DeploymentStatus.PENDING,
-            total_assets=5,
-            successful_assets=0,
-            failed_assets=0
+            deployment_method="ansible",
+            status=DeploymentStatus.PENDING
         )
 
         test_db.add(deployment)
@@ -245,13 +250,15 @@ class TestDeploymentModel:
         assert deployment.patch_id == sample_patch.id
         assert deployment.strategy == "rolling"
 
-    def test_deployment_patch_relationship(self, test_db, sample_patch):
+    def test_deployment_patch_relationship(self, test_db, sample_patch, sample_asset):
         """Test relationship between Deployment and Patch"""
         deployment = Deployment(
+            deployment_id="deploy-test-002",
             patch_id=sample_patch.id,
+            asset_id=sample_asset.id,
             strategy="canary",
-            status=DeploymentStatus.PENDING,
-            total_assets=10
+            deployment_method="ansible",
+            status=DeploymentStatus.PENDING
         )
 
         test_db.add(deployment)
@@ -262,33 +269,34 @@ class TestDeploymentModel:
         assert deployment.patch is not None
         assert deployment.patch.title == sample_patch.title
 
-    def test_deployment_status_transitions(self, test_db, sample_patch):
+    def test_deployment_status_transitions(self, test_db, sample_patch, sample_asset):
         """Test deployment status transitions"""
         deployment = Deployment(
+            deployment_id="deploy-test-003",
             patch_id=sample_patch.id,
+            asset_id=sample_asset.id,
             strategy="all-at-once",
-            status=DeploymentStatus.PENDING,
-            total_assets=3
+            deployment_method="ansible",
+            status=DeploymentStatus.PENDING
         )
 
         test_db.add(deployment)
         test_db.commit()
 
-        # Transition to in_progress
-        deployment.status = DeploymentStatus.IN_PROGRESS
+        # Transition to deploying
+        deployment.status = DeploymentStatus.DEPLOYING
         deployment.started_at = datetime.utcnow()
         test_db.commit()
 
-        assert deployment.status == DeploymentStatus.IN_PROGRESS
+        assert deployment.status == DeploymentStatus.DEPLOYING
         assert deployment.started_at is not None
 
-        # Transition to completed
-        deployment.status = DeploymentStatus.COMPLETED
+        # Transition to success
+        deployment.status = DeploymentStatus.SUCCESS
         deployment.completed_at = datetime.utcnow()
-        deployment.successful_assets = 3
         test_db.commit()
 
-        assert deployment.status == DeploymentStatus.COMPLETED
+        assert deployment.status == DeploymentStatus.SUCCESS
         assert deployment.completed_at is not None
 
 
@@ -303,14 +311,18 @@ class TestModelRelationships:
             title="Patch 1",
             patch_type=PatchType.SCRIPT_EXECUTION,
             patch_content="test1",
-            confidence_score=80.0
+            confidence_score=80.0,
+            llm_provider="openai",
+            llm_model="gpt-4"
         )
         patch2 = Patch(
             vulnerability_id=sample_vulnerability.id,
             title="Patch 2",
             patch_type=PatchType.SCRIPT_EXECUTION,
             patch_content="test2",
-            confidence_score=85.0
+            confidence_score=85.0,
+            llm_provider="openai",
+            llm_model="gpt-4"
         )
 
         test_db.add_all([patch1, patch2])
@@ -341,7 +353,9 @@ class TestModelRelationships:
                 title=f"Patch {i}",
                 patch_type=PatchType.SCRIPT_EXECUTION,
                 patch_content=f"content {i}",
-                confidence_score=80.0 + i
+                confidence_score=80.0 + i,
+                llm_provider="openai",
+                llm_model="gpt-4"
             )
             test_db.add(patch)
         test_db.commit()

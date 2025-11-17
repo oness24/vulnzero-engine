@@ -121,7 +121,7 @@ def sample_patch(test_db: Session, sample_vulnerability: Vulnerability) -> Patch
         patch_type=PatchType.SCRIPT_EXECUTION,
         patch_content="#!/bin/bash\napt-get update && apt-get install -y webapp=1.0.1",
         rollback_script="#!/bin/bash\napt-get install -y webapp=1.0.0",
-        status=PatchStatus.PENDING_APPROVAL,
+        status=PatchStatus.GENERATED,
         confidence_score=85.5,
         validation_passed=True,
         llm_provider="openai",
