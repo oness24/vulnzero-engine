@@ -11,7 +11,7 @@ from datetime import datetime
 from shared.models import (
     Vulnerability, Asset, Patch, Deployment,
     VulnerabilityStatus, AssetType, AssetStatus,
-    PatchType, PatchStatus, DeploymentStatus
+    PatchType, PatchStatus, DeploymentStatus, DeploymentStrategy
 )
 
 
@@ -237,7 +237,7 @@ class TestDeploymentModel:
             deployment_id="deploy-test-001",
             patch_id=sample_patch.id,
             asset_id=sample_asset.id,
-            strategy="rolling",
+            strategy=DeploymentStrategy.ROLLING,
             deployment_method="ansible",
             status=DeploymentStatus.PENDING
         )
@@ -248,7 +248,7 @@ class TestDeploymentModel:
 
         assert deployment.id is not None
         assert deployment.patch_id == sample_patch.id
-        assert deployment.strategy == "rolling"
+        assert deployment.strategy == DeploymentStrategy.ROLLING
 
     def test_deployment_patch_relationship(self, test_db, sample_patch, sample_asset):
         """Test relationship between Deployment and Patch"""
@@ -256,7 +256,7 @@ class TestDeploymentModel:
             deployment_id="deploy-test-002",
             patch_id=sample_patch.id,
             asset_id=sample_asset.id,
-            strategy="canary",
+            strategy=DeploymentStrategy.CANARY,
             deployment_method="ansible",
             status=DeploymentStatus.PENDING
         )
@@ -275,7 +275,7 @@ class TestDeploymentModel:
             deployment_id="deploy-test-003",
             patch_id=sample_patch.id,
             asset_id=sample_asset.id,
-            strategy="all-at-once",
+            strategy=DeploymentStrategy.ALL_AT_ONCE,
             deployment_method="ansible",
             status=DeploymentStatus.PENDING
         )
