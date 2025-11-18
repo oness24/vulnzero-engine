@@ -313,9 +313,26 @@ app.include_router(metrics.router, prefix="/api")
 @app.on_event("startup")
 async def startup_event():
     """
-    Application startup
+    Application startup - Initialize Sentry and verify database connection
     """
     logger.info("vulnzero_api_starting")
+
+    # Initialize Sentry error tracking
+    try:
+        from shared.monitoring import init_sentry_for_environment
+        import os
+
+        environment = os.getenv("ENVIRONMENT", "development")
+        release = os.getenv("RELEASE_VERSION") or os.getenv("GIT_COMMIT_SHA")
+
+        if init_sentry_for_environment(environment, release=release):
+            logger.info("sentry_initialized", environment=environment, release=release)
+        else:
+            logger.info("sentry_not_configured", message="Sentry DSN not set, continuing without error tracking")
+
+    except Exception as e:
+        logger.warning("sentry_initialization_failed", error=str(e))
+        # Continue even if Sentry fails
 
     # Initialize services if needed
     try:
