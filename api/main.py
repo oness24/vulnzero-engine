@@ -12,6 +12,7 @@ import structlog
 import time
 
 from api.routes import (
+    auth,
     vulnerabilities,
     patches,
     deployments,
@@ -204,6 +205,7 @@ async def root():
 
 
 # Include routers
+app.include_router(auth.router, prefix="/api")
 app.include_router(vulnerabilities.router, prefix="/api")
 app.include_router(patches.router, prefix="/api")
 app.include_router(deployments.router, prefix="/api")

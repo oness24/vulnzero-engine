@@ -84,7 +84,57 @@ class JobStatus(str, PyEnum):
     RETRYING = "retrying"
 
 
+class UserRole(str, PyEnum):
+    """User roles for access control"""
+    ADMIN = "admin"
+    DEVELOPER = "developer"
+    VIEWER = "viewer"
+
+
 # Models
+class User(Base):
+    """User model - authentication and authorization"""
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Authentication
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Role-based access control
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole),
+        default=UserRole.VIEWER,
+        nullable=False,
+        index=True
+    )
+
+    # Security
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_login_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    password_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_user_role_active", "role", "is_active"),
+    )
+
+
+
 class Vulnerability(Base):
     """Vulnerability model - stores detected vulnerabilities"""
     __tablename__ = "vulnerabilities"

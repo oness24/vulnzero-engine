@@ -13,6 +13,7 @@ from shared.models.models import (
     DeploymentStatus,
     DeploymentMethod,
     JobStatus,
+    UserRole,
 )
 
 
@@ -274,13 +275,26 @@ class UserLogin(BaseSchema):
     password: str
 
 
-class User(BaseSchema):
+class UserResponse(BaseSchema):
     """User response"""
     id: int
     username: str
     email: str
+    full_name: Optional[str] = None
     is_active: bool
+    is_superuser: bool
     role: str
+    last_login_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class UserCreate(BaseSchema):
+    """User creation request"""
+    username: str = Field(..., min_length=3, max_length=100)
+    email: str = Field(..., description="Email address")
+    password: str = Field(..., min_length=8, description="Password (min 8 characters)")
+    full_name: Optional[str] = Field(None, max_length=255)
+    role: str = Field(default="viewer", description="User role")
 
 
 # Health & System Schemas

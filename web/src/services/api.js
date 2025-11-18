@@ -382,6 +382,24 @@ export const authApi = {
    * Get current user
    */
   me: () => apiClient.get('/api/auth/me'),
+
+  /**
+   * Register new user (Admin only)
+   * @param {Object} data - { username, email, password, full_name, role }
+   */
+  register: (data) => apiClient.post('/api/auth/register', data),
+
+  /**
+   * List all users (Admin only)
+   * @param {Object} params - Query parameters { skip, limit }
+   */
+  listUsers: (params = {}) => apiClient.get('/api/auth/users', { params }),
+
+  /**
+   * Delete user (Admin only)
+   * @param {number} userId - User ID
+   */
+  deleteUser: (userId) => apiClient.delete(`/api/auth/users/${userId}`),
 }
 
 // Export the axios instance for custom requests
