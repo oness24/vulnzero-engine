@@ -1,0 +1,56 @@
+# VulnZero Database Migrations
+
+This directory contains Alembic database migrations for VulnZero.
+
+## Usage
+
+### Create a new migration
+```bash
+make db-revision MESSAGE="description of changes"
+# or
+alembic revision --autogenerate -m "description of changes"
+```
+
+### Apply migrations
+```bash
+make db-migrate
+# or
+alembic upgrade head
+```
+
+### Rollback migrations
+```bash
+make db-rollback
+# or
+alembic downgrade -1
+```
+
+### View migration history
+```bash
+alembic history
+```
+
+### View current version
+```bash
+alembic current
+```
+
+## Migration Naming Convention
+
+Migrations are automatically named with timestamp and slug:
+- Format: YYYYMMDD_HHMM_{revision}_{slug}
+- Example: 20241117_1430_a1b2c3d4e5f6_initial_schema
+
+## Important Notes
+
+1. **Always review auto-generated migrations** before applying them
+2. Test migrations in development environment first
+3. Backup production database before running migrations
+4. Migrations should be idempotent when possible
+5. Never edit migrations that have been applied to production
+
+## Migration Files
+
+- `env.py` - Migration environment configuration
+- `script.py.mako` - Template for new migration files
+- `versions/` - Directory containing all migration scripts

@@ -1,3 +1,4 @@
+"""Scanner integration modules"""
 """Scanner implementations"""
 
 from services.aggregator.scanners.wazuh_adapter import WazuhAdapter
