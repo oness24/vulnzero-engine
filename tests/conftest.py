@@ -22,8 +22,8 @@ from shared.models.models import (
     DeploymentStatus,
     DeploymentMethod,
 )
-from services.api_gateway.main import app
-from services.api_gateway.auth import create_access_token
+from api.main import app
+from api.routes.auth import create_access_token
 
 # Test database URL (use in-memory SQLite for fast tests)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

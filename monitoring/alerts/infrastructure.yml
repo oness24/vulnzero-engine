@@ -1,0 +1,127 @@
+groups:
+- name: vulnzero_infrastructure_alerts
+  interval: 30s
+  rules:
+  # High CPU Usage
+  - alert: HighCPUUsage
+    expr: |
+      (
+        100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+      ) > 80
+    for: 10m
+    labels:
+      severity: warning
+      component: infrastructure
+    annotations:
+      summary: "High CPU usage on {{ $labels.instance }}"
+      description: "CPU usage is {{ $value }}% (threshold: 80%)"
+
+  # High Memory Usage
+  - alert: HighMemoryUsage
+    expr: |
+      (
+        (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+        /
+        node_memory_MemTotal_bytes
+      ) * 100 > 85
+    for: 10m
+    labels:
+      severity: critical
+      component: infrastructure
+    annotations:
+      summary: "High memory usage on {{ $labels.instance }}"
+      description: "Memory usage is {{ $value }}% (threshold: 85%)"
+
+  # Disk Space Low
+  - alert: DiskSpaceLow
+    expr: |
+      (
+        (node_filesystem_size_bytes - node_filesystem_avail_bytes)
+        /
+        node_filesystem_size_bytes
+      ) * 100 > 80
+    for: 10m
+    labels:
+      severity: warning
+      component: infrastructure
+    annotations:
+      summary: "Low disk space on {{ $labels.instance }}"
+      description: "Disk usage is {{ $value }}% on {{ $labels.mountpoint }}"
+
+  # High Disk I/O
+  - alert: HighDiskIO
+    expr: rate(node_disk_io_time_seconds_total[5m]) > 0.9
+    for: 10m
+    labels:
+      severity: warning
+      component: infrastructure
+    annotations:
+      summary: "High disk I/O on {{ $labels.instance }}"
+      description: "Disk I/O utilization is {{ $value | humanizePercentage }}"
+
+  # Pod Restart Rate
+  - alert: HighPodRestartRate
+    expr: rate(kube_pod_container_status_restarts_total{namespace="vulnzero"}[15m]) > 0.05
+    for: 10m
+    labels:
+      severity: warning
+      component: kubernetes
+    annotations:
+      summary: "Pod {{ $labels.pod }} is restarting frequently"
+      description: "Pod restart rate is {{ $value }} restarts/s"
+
+  # Pod CrashLooping
+  - alert: PodCrashLooping
+    expr: |
+      rate(kube_pod_container_status_restarts_total{namespace="vulnzero"}[5m]) > 0
+      and
+      kube_pod_container_status_waiting_reason{namespace="vulnzero",reason="CrashLoopBackOff"} == 1
+    for: 5m
+    labels:
+      severity: critical
+      component: kubernetes
+    annotations:
+      summary: "Pod {{ $labels.pod }} is crash looping"
+      description: "Pod has been crash looping for 5 minutes"
+
+  # Pod Not Ready
+  - alert: PodNotReady
+    expr: kube_pod_status_ready{namespace="vulnzero",condition="false"} == 1
+    for: 15m
+    labels:
+      severity: warning
+      component: kubernetes
+    annotations:
+      summary: "Pod {{ $labels.pod }} is not ready"
+      description: "Pod has been in not-ready state for 15 minutes"
+
+  # Container Memory Near Limit
+  - alert: ContainerMemoryNearLimit
+    expr: |
+      (
+        container_memory_usage_bytes{namespace="vulnzero"}
+        /
+        container_spec_memory_limit_bytes{namespace="vulnzero"}
+      ) > 0.9
+    for: 5m
+    labels:
+      severity: warning
+      component: kubernetes
+    annotations:
+      summary: "Container {{ $labels.container }} memory near limit"
+      description: "Memory usage is {{ $value | humanizePercentage }} of limit"
+
+  # Container CPU Throttling
+  - alert: ContainerCPUThrottling
+    expr: |
+      rate(container_cpu_cfs_throttled_seconds_total{namespace="vulnzero"}[5m])
+      /
+      rate(container_cpu_cfs_periods_total{namespace="vulnzero"}[5m])
+      > 0.5
+    for: 10m
+    labels:
+      severity: warning
+      component: kubernetes
+    annotations:
+      summary: "Container {{ $labels.container }} is being throttled"
+      description: "CPU throttling is {{ $value | humanizePercentage }}"

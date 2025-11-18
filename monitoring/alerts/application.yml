@@ -1,0 +1,120 @@
+groups:
+- name: vulnzero_application_alerts
+  interval: 30s
+  rules:
+  # High Error Rate
+  - alert: HighErrorRate
+    expr: |
+      (
+        rate(vulnzero_http_requests_total{status=~"5.."}[5m])
+        /
+        rate(vulnzero_http_requests_total[5m])
+      ) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+      component: api
+    annotations:
+      summary: "High error rate detected"
+      description: "API error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+  # Service Down
+  - alert: ServiceDown
+    expr: up{job="vulnzero-api"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      component: api
+    annotations:
+      summary: "VulnZero API is down"
+      description: "The VulnZero API service has been down for more than 2 minutes"
+
+  # Slow Response Time
+  - alert: SlowResponseTime
+    expr: |
+      histogram_quantile(0.95,
+        rate(vulnzero_request_duration_seconds_bucket[5m])
+      ) > 2
+    for: 10m
+    labels:
+      severity: warning
+      component: api
+    annotations:
+      summary: "Slow API response time"
+      description: "95th percentile response time is {{ $value }}s (threshold: 2s)"
+
+  # High Request Rate
+  - alert: HighRequestRate
+    expr: rate(vulnzero_http_requests_total[5m]) > 1000
+    for: 10m
+    labels:
+      severity: warning
+      component: api
+    annotations:
+      summary: "High request rate detected"
+      description: "Request rate is {{ $value }} req/s (threshold: 1000 req/s)"
+
+  # Low Success Rate for Patch Generation
+  - alert: LowPatchSuccessRate
+    expr: |
+      (
+        rate(vulnzero_patches_generated_total{type="success"}[1h])
+        /
+        rate(vulnzero_patches_generated_total[1h])
+      ) < 0.8
+    for: 30m
+    labels:
+      severity: warning
+      component: patch-generator
+    annotations:
+      summary: "Low patch generation success rate"
+      description: "Patch success rate is {{ $value | humanizePercentage }} (threshold: 80%)"
+
+  # High Vulnerability Backlog
+  - alert: HighVulnerabilityBacklog
+    expr: vulnzero_active_vulnerabilities{severity="critical"} > 100
+    for: 1h
+    labels:
+      severity: warning
+      component: aggregator
+    annotations:
+      summary: "High number of unpatched critical vulnerabilities"
+      description: "{{ $value }} critical vulnerabilities are unpatched"
+
+  # Deployment Failures
+  - alert: HighDeploymentFailureRate
+    expr: |
+      (
+        rate(vulnzero_deployments_total{status="failed"}[1h])
+        /
+        rate(vulnzero_deployments_total[1h])
+      ) > 0.2
+    for: 30m
+    labels:
+      severity: warning
+      component: deployment-engine
+    annotations:
+      summary: "High deployment failure rate"
+      description: "Deployment failure rate is {{ $value | humanizePercentage }} (threshold: 20%)"
+
+  # WebSocket Connections
+  - alert: TooManyWebSocketConnections
+    expr: vulnzero_active_websocket_connections > 1000
+    for: 15m
+    labels:
+      severity: warning
+      component: api
+    annotations:
+      summary: "High number of WebSocket connections"
+      description: "{{ $value }} active WebSocket connections (threshold: 1000)"
+
+  # System Health Score
+  - alert: LowSystemHealthScore
+    expr: vulnzero_system_health_score < 70
+    for: 10m
+    labels:
+      severity: warning
+      component: monitoring
+    annotations:
+      summary: "System health score is low"
+      description: "System health score is {{ $value }} (threshold: 70)"
