@@ -2,6 +2,9 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { motion, AnimatePresence } from 'framer-motion'
 
+// Providers
+import { WebSocketProvider } from './components/providers/WebSocketProvider'
+
 // Layout
 import Layout from './components/layout/Layout'
 
@@ -17,7 +20,8 @@ import Settings from './pages/Settings'
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-cyber-darker">
+      <WebSocketProvider>
+        <div className="min-h-screen bg-cyber-darker">
         {/* Animated background gradient */}
         <div className="fixed inset-0 bg-gradient-to-br from-cyber-dark via-cyber-darker to-cyber-dark opacity-50 pointer-events-none" />
 
@@ -66,7 +70,8 @@ function App() {
             },
           }}
         />
-      </div>
+        </div>
+      </WebSocketProvider>
     </Router>
   )
 }
