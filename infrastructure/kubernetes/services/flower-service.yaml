@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: flower-service
+  namespace: vulnzero
+  labels:
+    app: vulnzero
+    component: flower
+spec:
+  type: ClusterIP
+  selector:
+    app: vulnzero
+    component: flower
+  ports:
+  - name: http
+    port: 5555
+    targetPort: http
+    protocol: TCP
