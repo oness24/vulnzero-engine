@@ -1,0 +1,75 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vulnzero-celery-worker-hpa
+  namespace: vulnzero
+  labels:
+    app: vulnzero
+    component: celery-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vulnzero-celery-worker
+  minReplicas: 2
+  maxReplicas: 20  # Allow more workers for high task load
+  metrics:
+  # Scale based on CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+
+  # Scale based on memory utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+
+  # Scale based on Celery queue depth (custom metric)
+  - type: External
+    external:
+      metric:
+        name: celery_queue_length
+        selector:
+          matchLabels:
+            queue_name: celery
+      target:
+        type: AverageValue
+        averageValue: "50"  # Scale up if queue length > 50 tasks per worker
+
+  # Scale based on active tasks per worker
+  - type: Pods
+    pods:
+      metric:
+        name: celery_active_tasks
+      target:
+        type: AverageValue
+        averageValue: "4"  # Scale up if > 4 active tasks per worker
+
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # Wait 10 minutes before scaling down workers
+      policies:
+      - type: Percent
+        value: 25  # Scale down by max 25% at once
+        periodSeconds: 120
+      - type: Pods
+        value: 1  # Scale down by max 1 worker at a time
+        periodSeconds: 120
+      selectPolicy: Min
+
+    scaleUp:
+      stabilizationWindowSeconds: 30  # Quickly scale up for task backlog
+      policies:
+      - type: Percent
+        value: 200  # Can triple workers quickly
+        periodSeconds: 30
+      - type: Pods
+        value: 5  # Add up to 5 workers at once
+        periodSeconds: 30
+      selectPolicy: Max

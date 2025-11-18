@@ -1,0 +1,39 @@
+# Docker Compose for Testing
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: vulnzero_test
+      POSTGRES_USER: vulnzero
+      POSTGRES_PASSWORD: vulnzero_password
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+
+  # Run tests
+  test:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    command: pytest tests/ -v --cov=services --cov=shared --cov-report=term-missing
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero_test
+      - REDIS_URL=redis://redis:6379/0
+      - API_SECRET_KEY=test-secret-key-for-ci
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./tests:/app/tests
+      - ./services:/app/services
+      - ./shared:/app/shared

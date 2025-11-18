@@ -19,3 +19,5 @@ __all__ = [
     "AlertSeverity",
     "RollbackEngine",
 ]
+Monitoring and rollback system for deployments
+"""

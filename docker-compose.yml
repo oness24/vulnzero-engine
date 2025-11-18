@@ -23,6 +23,8 @@ services:
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-vulnzero}"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vulnzero"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,12 +39,18 @@ services:
     container_name: vulnzero-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-vulnzero_redis_password}
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: vulnzero-redis
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,6 +98,24 @@ services:
       dockerfile: services/aggregator/Dockerfile
     container_name: vulnzero-aggregator
     restart: unless-stopped
+  # FastAPI Backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: vulnzero-api
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - JWT_SECRET_KEY=dev-secret-key-change-in-production
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
+    ports:
+      - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -176,6 +202,29 @@ services:
       dockerfile: services/deployment-engine/Dockerfile
     container_name: vulnzero-deployment-engine
     restart: unless-stopped
+    volumes:
+      - ./api:/app/api
+      - ./shared:/app/shared
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: vulnzero-celery-worker
+    command: celery -A shared.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -228,6 +277,26 @@ services:
       dockerfile: Dockerfile
     container_name: vulnzero-celery-worker
     restart: unless-stopped
+    volumes:
+      - ./api:/app/api
+      - ./shared:/app/shared
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Celery Beat (Scheduler)
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: vulnzero-celery-beat
+    command: celery -A shared.celery_app beat --loglevel=info
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://vulnzero:vulnzero_password@postgres:5432/vulnzero
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
     depends_on:
       postgres:
         condition: service_healthy
@@ -376,3 +445,96 @@ volumes:
     name: vulnzero-grafana-data
   pgadmin_data:
     name: vulnzero-pgadmin-data
+    volumes:
+      - ./api:/app/api
+      - ./shared:/app/shared
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: vulnzero-frontend
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Flower (Celery Monitoring)
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: vulnzero-flower
+    command: celery -A shared.celery_app flower --port=5555
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+
+  # Prometheus (optional - use 'monitoring' profile)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vulnzero-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana (optional - use 'monitoring' profile)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vulnzero-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=redis-datasource
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - vulnzero-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  vulnzero-network:
+    driver: bridge

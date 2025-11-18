@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnzero-flower
+  namespace: vulnzero
+  labels:
+    app: vulnzero
+    component: flower
+    tier: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vulnzero
+      component: flower
+  template:
+    metadata:
+      labels:
+        app: vulnzero
+        component: flower
+        tier: monitoring
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      containers:
+      - name: flower
+        image: vulnzero/api:latest
+        imagePullPolicy: IfNotPresent
+        command: ["celery"]
+        args: ["-A", "shared.celery_app", "flower", "--port=5555"]
+
+        ports:
+        - name: http
+          containerPort: 5555
+          protocol: TCP
+
+        env:
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: vulnzero-secrets
+              key: CELERY_BROKER_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: vulnzero-secrets
+              key: CELERY_RESULT_BACKEND
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+
+      restartPolicy: Always

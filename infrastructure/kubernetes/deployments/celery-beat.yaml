@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnzero-celery-beat
+  namespace: vulnzero
+  labels:
+    app: vulnzero
+    component: celery-beat
+    tier: backend
+spec:
+  replicas: 1  # Only one beat scheduler needed
+  selector:
+    matchLabels:
+      app: vulnzero
+      component: celery-beat
+  template:
+    metadata:
+      labels:
+        app: vulnzero
+        component: celery-beat
+        tier: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      containers:
+      - name: celery-beat
+        image: vulnzero/api:latest
+        imagePullPolicy: IfNotPresent
+        command: ["celery"]
+        args: ["-A", "shared.celery_app", "beat", "--loglevel=info"]
+
+        env:
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: vulnzero-config
+              key: ENVIRONMENT
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: vulnzero-secrets
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: vulnzero-secrets
+              key: REDIS_URL
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: vulnzero-secrets
+              key: CELERY_BROKER_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: vulnzero-secrets
+              key: CELERY_RESULT_BACKEND
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - shared.celery_app
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+
+      restartPolicy: Always
