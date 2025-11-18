@@ -119,11 +119,21 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware - secure configuration based on environment
+# Define allowed origins for development (more restrictive than "*")
+CORS_ORIGINS_DEV = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list if settings.is_production else ["*"],
+    allow_origins=settings.cors_origins_list if settings.is_production else CORS_ORIGINS_DEV,
     allow_credentials=settings.cors_allow_credentials,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
