@@ -407,8 +407,11 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.unit)
         elif "integration" in str(item.fspath):
             item.add_marker(pytest.mark.integration)
-Pytest configuration and shared fixtures
-"""
+
+
+# =============================================================================
+# Async Test Fixtures (Additional)
+# =============================================================================
 
 import asyncio
 from typing import AsyncGenerator, Generator
