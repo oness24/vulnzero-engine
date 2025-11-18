@@ -12,61 +12,30 @@ from shared.models.audit_log import AuditLog, AuditAction, AuditResourceType
 from shared.models.remediation_job import RemediationJob, JobType, JobStatus
 
 __all__ = [
-    "Base",
-    # Models
-    "Vulnerability",
-    "Asset",
-"""Database models for VulnZero"""
-
-from shared.models.database import Base, get_db, init_db, drop_db, engine, AsyncSessionLocal
-from shared.models.models import (
-    Vulnerability,
-    Asset,
-    AssetVulnerability,
-    Patch,
-    Deployment,
-    AuditLog,
-    RemediationJob,
-    VulnerabilityStatus,
-    VulnerabilitySeverity,
-    AssetType,
-    TestStatus,
-    DeploymentStatus,
-    DeploymentMethod,
-    JobStatus,
-)
-
-__all__ = [
     # Database
     "Base",
-    "get_db",
-    "init_db",
-    "drop_db",
-    "engine",
-    "AsyncSessionLocal",
     # Models
     "Vulnerability",
     "Asset",
-    "AssetVulnerability",
     "Patch",
     "Deployment",
     "AuditLog",
     "RemediationJob",
-    # Enums
+    # Enums - Vulnerability
     "VulnerabilityStatus",
+    # Enums - Asset
     "AssetType",
     "AssetStatus",
+    # Enums - Patch
     "PatchType",
     "PatchStatus",
+    # Enums - Deployment
     "DeploymentStatus",
     "DeploymentStrategy",
+    # Enums - Audit
     "AuditAction",
     "AuditResourceType",
+    # Enums - Remediation Job
     "JobType",
-    "VulnerabilitySeverity",
-    "AssetType",
-    "TestStatus",
-    "DeploymentStatus",
-    "DeploymentMethod",
     "JobStatus",
 ]
