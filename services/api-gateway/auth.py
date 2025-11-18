@@ -113,6 +113,9 @@ async def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
+    from sqlalchemy import select
+    from shared.models.models import User
+
     token = credentials.credentials
 
     try:
@@ -126,18 +129,40 @@ async def get_current_user(
             )
 
         username: str = payload.get("sub")
-        if username is None:
+        user_id: int = payload.get("user_id")
+
+        if username is None or user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
             )
 
-        # TODO: Fetch user from database
-        # For now, return payload data
+        # Fetch user from database to ensure they still exist and are active
+        query = select(User).where(User.id == user_id, User.username == username)
+        result = await db.execute(query)
+        user = result.scalar_one_or_none()
+
+        # User not found in database (may have been deleted)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User no longer exists. Please log in again.",
+            )
+
+        # Check if user is still active
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is inactive. Please contact support.",
+            )
+
+        # Return user data with current database state
         user_data = {
-            "username": username,
-            "role": payload.get("role", "viewer"),
-            "user_id": payload.get("user_id"),
+            "username": user.username,
+            "role": user.role.value,
+            "user_id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
         }
 
         return user_data
@@ -154,16 +179,19 @@ async def get_current_active_user(current_user: dict = Depends(get_current_user)
     """
     Get the current active user
 
+    This function is a convenience wrapper around get_current_user.
+    User active status is already checked in get_current_user by querying the database.
+
     Args:
-        current_user: Current user from token
+        current_user: Current user from token (already validated as active)
 
     Returns:
         User information
 
     Raises:
-        HTTPException: If user is inactive
+        HTTPException: If user is inactive (handled by get_current_user)
     """
-    # TODO: Check if user is active in database
+    # Active status already verified in get_current_user
     return current_user
 
 
