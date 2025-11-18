@@ -111,6 +111,7 @@ addopts = [
     "-q",
     "--strict-markers",
     "--strict-config",
+    "--cov=api",
     "--cov=services",
     "--cov=shared",
     "--cov-report=term-missing",
@@ -130,7 +131,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["services", "shared"]
+source = ["api", "services", "shared"]
 omit = [
     "*/tests/*",
     "*/__init__.py",

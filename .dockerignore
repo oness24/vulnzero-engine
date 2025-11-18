@@ -45,12 +45,24 @@ logs/
 # Documentation
 docs/_build/
 *.md
+!README.md
 
 # CI/CD
 .github/
+.gitlab-ci.yml
+.travis.yml
 
 # Docker
 docker-compose.override.yml
+Dockerfile*
+.dockerignore
+
+# Frontend (not needed in API container)
+web/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Temporary files
 tmp/
