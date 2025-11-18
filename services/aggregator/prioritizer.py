@@ -23,12 +23,14 @@ class VulnerabilityPrioritizer:
     def __init__(self):
         self.scaler = MinMaxScaler()
         self.weights = {
-            "cvss_score": 0.30,  # CVSS base score
-            "epss_score": 0.25,  # Exploit prediction
-            "severity": 0.20,    # Severity level
+            "cvss_score": 0.25,  # CVSS base score
+            "epss_score": 0.20,  # Exploit prediction
+            "severity": 0.15,    # Severity level
             "asset_criticality": 0.15,  # Asset importance
-            "exploit_available": 0.10,  # Known exploits
+            "exploit_available": 0.25,  # Known exploits (CISA KEV, GitHub, etc.)
         }
+        # Note: exploit_available has highest weight alongside CVSS because
+        # known exploits in the wild represent immediate, confirmed risk
 
     def calculate_priority_score(
         self,

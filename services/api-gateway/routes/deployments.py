@@ -118,14 +118,16 @@ async def rollback_deployment(
     # Mark for rollback
     deployment.rollback_required = True
     deployment.rollback_reason = rollback_data.reason
-    deployment.status = DeploymentStatus.ROLLED_BACK
-    deployment.rolled_back_at = datetime.utcnow()
 
     await db.commit()
     await db.refresh(deployment)
 
-    # TODO: Trigger rollback job
-    # from services.deployment_engine.tasks import execute_rollback
-    # execute_rollback.delay(deployment_id)
+    # Trigger async rollback task
+    from services.deployment_engine.tasks import rollback_deployment
+    task = rollback_deployment.delay(deployment_id)
 
-    return deployment
+    return {
+        "deployment": deployment,
+        "rollback_task_id": task.id,
+        "message": "Rollback initiated",
+    }

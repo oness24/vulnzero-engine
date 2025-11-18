@@ -10,6 +10,7 @@
 
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { logger } from '../utils/logger'
 
 // API Base URL from environment variable or default to localhost
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -36,15 +37,13 @@ apiClient.interceptors.request.use(
     // Add request ID for tracing
     config.headers['X-Request-ID'] = generateRequestId()
 
-    // Log request in development
-    if (import.meta.env.DEV) {
-      console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`, config.params || config.data)
-    }
+    // Log request
+    logger.apiRequest(config.method || 'GET', config.url, config.params || config.data)
 
     return config
   },
   (error) => {
-    console.error('Request interceptor error:', error)
+    logger.error('Request interceptor error', error)
     return Promise.reject(error)
   }
 )
@@ -52,19 +51,20 @@ apiClient.interceptors.request.use(
 // Response interceptor - Handle errors globally
 apiClient.interceptors.response.use(
   (response) => {
-    // Log response in development
-    if (import.meta.env.DEV) {
-      console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data)
-    }
+    // Log response
+    logger.apiResponse(response.config.method || 'GET', response.config.url, response.data)
     return response
   },
   async (error) => {
     const originalRequest = error.config
 
-    // Log error in development
-    if (import.meta.env.DEV) {
-      console.error(`❌ API Error: ${error.response?.status} ${originalRequest?.url}`, error.response?.data)
-    }
+    // Log error
+    logger.apiError(
+      originalRequest?.method || 'GET',
+      originalRequest?.url || 'unknown',
+      error.response?.status || 0,
+      error.response?.data
+    )
 
     // Handle 401 Unauthorized - Token expired
     if (error.response?.status === 401 && !originalRequest._retry) {

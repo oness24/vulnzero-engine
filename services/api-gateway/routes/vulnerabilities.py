@@ -104,12 +104,30 @@ async def get_vulnerability_stats(
     remediated = result.scalar() or 0
     remediation_rate = (remediated / total * 100) if total > 0 else 0
 
+    # Calculate average time to remediate (in hours)
+    time_query = select(
+        Vulnerability.discovered_at,
+        Vulnerability.remediated_at
+    ).where(
+        Vulnerability.remediated_at.isnot(None)
+    )
+    result = await db.execute(time_query)
+    remediated_vulns = result.all()
+
+    avg_time_to_remediate = None
+    if remediated_vulns:
+        total_hours = 0.0
+        for discovered_at, remediated_at in remediated_vulns:
+            time_diff = remediated_at - discovered_at
+            total_hours += time_diff.total_seconds() / 3600
+        avg_time_to_remediate = round(total_hours / len(remediated_vulns), 2)
+
     return {
         "total": total,
         "by_severity": by_severity,
         "by_status": by_status,
         "remediation_rate": round(remediation_rate, 2),
-        "avg_time_to_remediate": None,  # TODO: Calculate from deployment data
+        "avg_time_to_remediate": avg_time_to_remediate,
     }
 
 
@@ -205,11 +223,12 @@ async def trigger_scan(
 
     This will enqueue a Celery task to scan all configured vulnerability scanners.
     """
-    # TODO: Trigger Celery task for scanning
-    # from services.aggregator.tasks import scan_all_sources
-    # task = scan_all_sources.delay()
+    from services.aggregator.tasks import scan_all_sources
+
+    # Trigger async Celery task
+    task = scan_all_sources.delay()
 
     return {
         "message": "Vulnerability scan triggered",
-        "task_id": "mock-task-id",  # TODO: Return actual Celery task ID
+        "task_id": task.id,
     }

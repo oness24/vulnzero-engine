@@ -49,9 +49,11 @@ class VulnerabilityStatsResponse(BaseModel):
     total_vulnerabilities: int
     by_severity: dict
     by_source: dict
+    by_status: dict
     patched: int
     unpatched: int
     in_progress: int
+    average_time_to_remediate_hours: Optional[float] = None
 
 
 class VulnerabilityDetailResponse(VulnerabilityResponse):
@@ -130,7 +132,7 @@ async def get_vulnerability_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get vulnerability statistics
+    Get vulnerability statistics including average time to remediate
     """
     try:
         # Total count
@@ -155,20 +157,67 @@ async def get_vulnerability_stats(
         )
         by_source = {source: count for source, count in result.all()}
 
-        # Status counts (simplified)
+        # By status
+        result = await db.execute(
+            select(
+                Vulnerability.status,
+                func.count(Vulnerability.id),
+            ).group_by(Vulnerability.status)
+        )
+        by_status = {status.value if hasattr(status, 'value') else status: count
+                     for status, count in result.all()}
+
+        # Status counts for convenience
+        from shared.models.models import VulnerabilityStatus
+        patched = by_status.get(VulnerabilityStatus.DEPLOYED.value, 0) + \
+                  by_status.get(VulnerabilityStatus.REMEDIATED.value, 0)
+
+        unpatched = by_status.get(VulnerabilityStatus.NEW.value, 0) + \
+                    by_status.get(VulnerabilityStatus.ANALYZING.value, 0) + \
+                    by_status.get(VulnerabilityStatus.FAILED.value, 0) + \
+                    by_status.get(VulnerabilityStatus.REJECTED.value, 0)
+
+        in_progress = by_status.get(VulnerabilityStatus.PATCH_GENERATED.value, 0) + \
+                      by_status.get(VulnerabilityStatus.TESTING.value, 0) + \
+                      by_status.get(VulnerabilityStatus.APPROVED.value, 0) + \
+                      by_status.get(VulnerabilityStatus.DEPLOYING.value, 0)
+
+        # Calculate average time to remediate
+        # Query vulnerabilities with remediated_at timestamp
+        result = await db.execute(
+            select(
+                Vulnerability.discovered_at,
+                Vulnerability.remediated_at
+            ).where(
+                Vulnerability.remediated_at.isnot(None)
+            )
+        )
+        remediated_vulns = result.all()
+
+        average_time_hours = None
+        if remediated_vulns:
+            total_hours = 0.0
+            for discovered_at, remediated_at in remediated_vulns:
+                time_diff = remediated_at - discovered_at
+                total_hours += time_diff.total_seconds() / 3600
+
+            average_time_hours = round(total_hours / len(remediated_vulns), 2)
+
         stats = {
             "total_vulnerabilities": total,
             "by_severity": by_severity,
             "by_source": by_source,
-            "patched": 0,  # Would need to join with patches
-            "unpatched": total,
-            "in_progress": 0,
+            "by_status": by_status,
+            "patched": patched,
+            "unpatched": unpatched,
+            "in_progress": in_progress,
+            "average_time_to_remediate_hours": average_time_hours,
         }
 
         return stats
 
     except Exception as e:
-        logger.error("get_vulnerability_stats_failed", error=str(e))
+        logger.error("get_vulnerability_stats_failed", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

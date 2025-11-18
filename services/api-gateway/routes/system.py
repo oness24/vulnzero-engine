@@ -32,11 +32,25 @@ async def health_check(db: AsyncSession = Depends(get_db)):
     except Exception:
         services["database"] = "unhealthy"
 
-    # TODO: Check Redis
-    services["redis"] = "unknown"
+    # Check Redis
+    try:
+        import redis
+        from shared.config.settings import settings
+        redis_client = redis.from_url(settings.redis_url)
+        redis_client.ping()
+        redis_client.close()
+        services["redis"] = "healthy"
+    except Exception:
+        services["redis"] = "unhealthy"
 
-    # TODO: Check Celery
-    services["celery"] = "unknown"
+    # Check Celery
+    try:
+        from shared.celery_app import app as celery_app
+        # Check broker connection
+        celery_app.connection().ensure_connection(max_retries=1, timeout=2)
+        services["celery"] = "healthy"
+    except Exception:
+        services["celery"] = "unhealthy"
 
     # Determine overall status
     overall_status = "healthy" if all(s == "healthy" for s in services.values()) else "degraded"
@@ -89,8 +103,23 @@ async def get_metrics(
     remediated = result.scalar() or 0
     remediation_rate = (remediated / vulnerabilities_scanned * 100) if vulnerabilities_scanned > 0 else 0
 
-    # TODO: Calculate avg time to remediate
+    # Calculate average time to remediate (in hours)
+    time_query = select(
+        Vulnerability.discovered_at,
+        Vulnerability.remediated_at
+    ).where(
+        Vulnerability.remediated_at.isnot(None)
+    )
+    result = await db.execute(time_query)
+    remediated_vulns = result.all()
+
     avg_time_to_remediate = 0.0
+    if remediated_vulns:
+        total_hours = 0.0
+        for discovered_at, remediated_at in remediated_vulns:
+            time_diff = remediated_at - discovered_at
+            total_hours += time_diff.total_seconds() / 3600
+        avg_time_to_remediate = round(total_hours / len(remediated_vulns), 2)
 
     return {
         "vulnerabilities_scanned": vulnerabilities_scanned,

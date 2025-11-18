@@ -58,12 +58,32 @@ async def list_assets(
         result = await db.execute(vuln_count_query)
         vuln_count = result.scalar() or 0
 
-        # TODO: Count by severity
+        # Count vulnerabilities by severity
+        from shared.models.models import VulnerabilitySeverity
+
+        severity_count_query = select(
+            Vulnerability.severity,
+            func.count(Vulnerability.id)
+        ).select_from(
+            AssetVulnerability
+        ).join(
+            Vulnerability,
+            AssetVulnerability.vulnerability_id == Vulnerability.id
+        ).where(
+            AssetVulnerability.asset_id == asset.id,
+            AssetVulnerability.resolved_at.is_(None)
+        ).group_by(Vulnerability.severity)
+
+        result = await db.execute(severity_count_query)
+        severity_counts = {str(severity): count for severity, count in result.all()}
+
         asset_dict = {
             **asset.__dict__,
             "vulnerability_count": vuln_count,
-            "critical_count": 0,
-            "high_count": 0,
+            "critical_count": severity_counts.get(VulnerabilitySeverity.CRITICAL.value, 0),
+            "high_count": severity_counts.get(VulnerabilitySeverity.HIGH.value, 0),
+            "medium_count": severity_counts.get(VulnerabilitySeverity.MEDIUM.value, 0),
+            "low_count": severity_counts.get(VulnerabilitySeverity.LOW.value, 0),
         }
         assets_with_vulns.append(asset_dict)
 

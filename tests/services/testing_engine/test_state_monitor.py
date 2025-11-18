@@ -267,7 +267,7 @@ def test_capture_state_with_specific_packages(state_monitor, mock_container_mana
         {"success": True, "stdout": "ID=ubuntu"},
         {"success": True, "stdout": "5.15.0"},
         {"success": True, "stdout": "Mem: 2048"},
-    }
+    ]
 
     state = state_monitor.capture_state(
         mock_container,

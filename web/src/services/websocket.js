@@ -10,6 +10,7 @@
 
 import io from 'socket.io-client'
 import toast from 'react-hot-toast'
+import { logger } from '../utils/logger'
 
 const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'http://localhost:8000'
 
@@ -28,7 +29,7 @@ class WebSocketService {
    */
   connect(options = {}) {
     if (this.socket?.connected) {
-      console.log('WebSocket already connected')
+      logger.websocket('already connected')
       return
     }
 
@@ -55,7 +56,7 @@ class WebSocketService {
   setupEventHandlers() {
     // Connection events
     this.socket.on('connect', () => {
-      console.log('✅ WebSocket connected')
+      logger.websocket('connect', { socketId: this.socket.id })
       this.isConnected = true
       this.reconnectAttempts = 0
 
@@ -67,7 +68,7 @@ class WebSocketService {
     })
 
     this.socket.on('disconnect', (reason) => {
-      console.log('❌ WebSocket disconnected:', reason)
+      logger.websocket('disconnect', { reason })
       this.isConnected = false
 
       if (import.meta.env.DEV) {
@@ -78,7 +79,7 @@ class WebSocketService {
     })
 
     this.socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error)
+      logger.websocket('error', { error: error.message })
       this.reconnectAttempts++
 
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -89,14 +90,14 @@ class WebSocketService {
     })
 
     this.socket.on('reconnect', (attemptNumber) => {
-      console.log(`✅ WebSocket reconnected after ${attemptNumber} attempts`)
+      logger.websocket('reconnect', { attemptNumber })
       toast.success('Real-time connection restored', { duration: 2000 })
       this.emit('reconnected', { attemptNumber })
     })
 
     // Deployment events
     this.socket.on('deployment_started', (data) => {
-      console.log('🚀 Deployment started:', data)
+      logger.websocket('deployment_started', data)
       this.emit('deployment_started', data)
 
       toast.success(`Deployment started: ${data.deployment_id}`, {
@@ -106,12 +107,12 @@ class WebSocketService {
     })
 
     this.socket.on('deployment_progress', (data) => {
-      console.log('📊 Deployment progress:', data)
+      logger.websocket('deployment_progress', data)
       this.emit('deployment_progress', data)
     })
 
     this.socket.on('deployment_completed', (data) => {
-      console.log('✅ Deployment completed:', data)
+      logger.websocket('deployment_completed', data)
       this.emit('deployment_completed', data)
 
       toast.success(`Deployment ${data.deployment_id} completed successfully!`, {
@@ -121,7 +122,7 @@ class WebSocketService {
     })
 
     this.socket.on('deployment_failed', (data) => {
-      console.log('❌ Deployment failed:', data)
+      logger.websocket('deployment_failed', data)
       this.emit('deployment_failed', data)
 
       toast.error(`Deployment ${data.deployment_id} failed: ${data.error}`, {
@@ -131,7 +132,7 @@ class WebSocketService {
     })
 
     this.socket.on('deployment_rolled_back', (data) => {
-      console.log('⏪ Deployment rolled back:', data)
+      logger.websocket('deployment_rolled_back', data)
       this.emit('deployment_rolled_back', data)
 
       toast.error(`Deployment ${data.deployment_id} was rolled back: ${data.reason}`, {
@@ -142,7 +143,7 @@ class WebSocketService {
 
     // Vulnerability events
     this.socket.on('vulnerability_detected', (data) => {
-      console.log('🔍 New vulnerability detected:', data)
+      logger.websocket('vulnerability_detected', data)
       this.emit('vulnerability_detected', data)
 
       const severity = data.severity?.toUpperCase()
@@ -156,7 +157,7 @@ class WebSocketService {
 
     // Patch events
     this.socket.on('patch_generated', (data) => {
-      console.log('🔧 Patch generated:', data)
+      logger.websocket('patch_generated', data)
       this.emit('patch_generated', data)
 
       toast.success(`Patch generated for ${data.vulnerability_cve} (Confidence: ${(data.confidence * 100).toFixed(0)}%)`, {
@@ -166,7 +167,7 @@ class WebSocketService {
     })
 
     this.socket.on('patch_approved', (data) => {
-      console.log('✅ Patch approved:', data)
+      logger.websocket('patch_approved', data)
       this.emit('patch_approved', data)
 
       toast.success(`Patch ${data.patch_id} approved`, {
@@ -176,7 +177,7 @@ class WebSocketService {
     })
 
     this.socket.on('patch_rejected', (data) => {
-      console.log('❌ Patch rejected:', data)
+      logger.websocket('patch_rejected', data)
       this.emit('patch_rejected', data)
 
       toast.error(`Patch ${data.patch_id} rejected: ${data.reason}`, {
@@ -187,7 +188,7 @@ class WebSocketService {
 
     // Alert events
     this.socket.on('alert', (data) => {
-      console.log('🚨 Alert:', data)
+      logger.websocket('alert', data)
       this.emit('alert', data)
 
       const severity = data.severity?.toUpperCase()
@@ -201,7 +202,7 @@ class WebSocketService {
 
     // Health/Monitoring events
     this.socket.on('health_degraded', (data) => {
-      console.log('⚠️ System health degraded:', data)
+      logger.websocket('health_degraded', data)
       this.emit('health_degraded', data)
 
       toast.error(`System health degraded: ${data.service}`, {
@@ -211,7 +212,7 @@ class WebSocketService {
     })
 
     this.socket.on('health_restored', (data) => {
-      console.log('✅ System health restored:', data)
+      logger.websocket('health_restored', data)
       this.emit('health_restored', data)
 
       toast.success(`System health restored: ${data.service}`, {
@@ -222,7 +223,7 @@ class WebSocketService {
 
     // Metrics updates
     this.socket.on('metrics_update', (data) => {
-      console.log('📊 Metrics update:', data)
+      logger.websocket('metrics_update', data)
       this.emit('metrics_update', data)
     })
   }
@@ -271,7 +272,7 @@ class WebSocketService {
       try {
         callback(data)
       } catch (error) {
-        console.error(`Error in event listener for ${event}:`, error)
+        logger.error(`Error in event listener for ${event}`, error)
       }
     })
   }
@@ -283,7 +284,7 @@ class WebSocketService {
    */
   send(event, data) {
     if (!this.socket?.connected) {
-      console.warn('WebSocket not connected. Cannot send message.')
+      logger.warn('WebSocket not connected, cannot send message', { event })
       return
     }
 
@@ -296,12 +297,12 @@ class WebSocketService {
    */
   joinRoom(room) {
     if (!this.socket?.connected) {
-      console.warn('WebSocket not connected. Cannot join room.')
+      logger.warn('WebSocket not connected, cannot join room', { room })
       return
     }
 
     this.socket.emit('join_room', { room })
-    console.log(`Joined room: ${room}`)
+    logger.debug(`Joined room: ${room}`)
   }
 
   /**
@@ -310,12 +311,12 @@ class WebSocketService {
    */
   leaveRoom(room) {
     if (!this.socket?.connected) {
-      console.warn('WebSocket not connected. Cannot leave room.')
+      logger.warn('WebSocket not connected, cannot leave room', { room })
       return
     }
 
     this.socket.emit('leave_room', { room })
-    console.log(`Left room: ${room}`)
+    logger.debug(`Left room: ${room}`)
   }
 
   /**
@@ -327,7 +328,7 @@ class WebSocketService {
       this.socket = null
       this.isConnected = false
       this.listeners.clear()
-      console.log('WebSocket disconnected')
+      logger.websocket('disconnect (manual)')
     }
   }
 

@@ -245,6 +245,7 @@ opentelemetry-api==1.22.0
 opentelemetry-sdk==1.22.0
 opentelemetry-instrumentation-fastapi==0.43b0
 structlog==24.1.0
+sentry-sdk[fastapi,sqlalchemy,redis,celery]==1.40.0
 
 # Testing
 pytest==7.4.4
@@ -254,6 +255,7 @@ pytest-mock==3.12.0
 httpx==0.26.0
 faker==22.5.1
 psutil==5.9.8
+locust==2.20.0  # Load testing
 
 # Data Processing
 pandas==2.2.0

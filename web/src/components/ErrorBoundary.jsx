@@ -1,11 +1,12 @@
 import { Component } from 'react'
 import { motion } from 'framer-motion'
+import { captureException } from '../utils/sentry'
 
 /**
  * Error Boundary Component
  *
  * Catches JavaScript errors anywhere in the child component tree,
- * logs the errors, and displays a fallback UI.
+ * logs the errors to Sentry, and displays a fallback UI.
  *
  * Usage:
  * <ErrorBoundary>
@@ -37,10 +38,18 @@ class ErrorBoundary extends Component {
       errorInfo,
     })
 
-    // TODO: Log to error reporting service (e.g., Sentry)
-    // if (window.Sentry) {
-    //   window.Sentry.captureException(error, { extra: errorInfo })
-    // }
+    // Log to Sentry with component stack trace
+    try {
+      captureException(error, {
+        componentStack: errorInfo.componentStack,
+        errorBoundary: true,
+        // Include props for debugging (be careful with sensitive data)
+        props: this.props,
+      })
+    } catch (sentryError) {
+      // If Sentry fails, just log it - don't break the error boundary
+      console.error('Failed to log error to Sentry:', sentryError)
+    }
   }
 
   handleReset = () => {

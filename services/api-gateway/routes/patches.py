@@ -103,9 +103,9 @@ async def approve_patch(
     await db.commit()
     await db.refresh(patch)
 
-    # TODO: Trigger deployment job
-    # from services.deployment_engine.tasks import schedule_deployment
-    # schedule_deployment.delay(patch_id)
+    # Note: Approved patches will be automatically deployed by the auto_deploy_tested_patches
+    # scheduled task, or can be manually deployed via the deployments endpoint.
+    # This separation of approval and deployment provides better control.
 
     return patch
 

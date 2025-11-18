@@ -250,8 +250,10 @@ async def health_check():
 
     # Check Redis
     try:
-        redis_client = redis.from_url(settings.redis_url)
+        from shared.config.settings import settings as app_settings
+        redis_client = redis.from_url(app_settings.redis_url)
         redis_client.ping()
+        redis_client.close()
         health["checks"]["redis"] = "ok"
         health["details"]["redis"] = "Redis connection verified"
     except Exception as e:
@@ -313,11 +315,28 @@ app.include_router(metrics.router, prefix="/api")
 @app.on_event("startup")
 async def startup_event():
     """
-    Application startup
+    Application startup - Initialize Sentry and verify database connection
     """
     logger.info("vulnzero_api_starting")
 
-    # Initialize services if needed
+    # Initialize Sentry error tracking
+    try:
+        from shared.monitoring import init_sentry_for_environment
+        import os
+
+        environment = os.getenv("ENVIRONMENT", "development")
+        release = os.getenv("RELEASE_VERSION") or os.getenv("GIT_COMMIT_SHA")
+
+        if init_sentry_for_environment(environment, release=release):
+            logger.info("sentry_initialized", environment=environment, release=release)
+        else:
+            logger.info("sentry_not_configured", message="Sentry DSN not set, continuing without error tracking")
+
+    except Exception as e:
+        logger.warning("sentry_initialization_failed", error=str(e))
+        # Continue even if Sentry fails
+
+    # Initialize database connection pool
     try:
         # Database connection check
         from shared.database.session import AsyncSessionLocal
@@ -330,6 +349,34 @@ async def startup_event():
         logger.error("startup_failed", error=str(e), exc_info=True)
         # Don't raise - allow app to start even if DB is temporarily unavailable
 
+    # Initialize Redis connection pool
+    try:
+        import redis
+        from shared.config.settings import settings as app_settings
+
+        redis_client = redis.from_url(app_settings.redis_url)
+        redis_client.ping()
+        redis_client.close()
+
+        logger.info("redis_connection_verified")
+    except Exception as e:
+        logger.warning("redis_connection_failed", error=str(e))
+        # Continue even if Redis is temporarily unavailable
+
+    # Initialize background tasks (Celery Beat scheduling)
+    try:
+        from shared.celery_app import app as celery_app
+
+        # Verify Celery broker connection
+        celery_app.connection().ensure_connection(max_retries=3)
+
+        logger.info("celery_broker_connected")
+        logger.info("background_tasks_initialized",
+                   message="Celery workers should be started separately")
+    except Exception as e:
+        logger.warning("celery_initialization_warning", error=str(e),
+                      message="Celery workers may need to be started manually")
+
     logger.info("vulnzero_api_started")
 
 
@@ -337,12 +384,31 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """
-    Application shutdown
+    Application shutdown - Close database and Redis connections gracefully
     """
     logger.info("vulnzero_api_shutting_down")
 
-    # Cleanup tasks
-    # Close database connections, etc.
+    # Close database connections
+    try:
+        from shared.models.database import engine
+        if engine:
+            await engine.dispose()
+            logger.info("database_connections_closed")
+    except Exception as e:
+        logger.warning("database_shutdown_failed", error=str(e))
+
+    # Close Redis connections
+    try:
+        from shared.config.settings import settings
+        import redis.asyncio as aioredis
+
+        # If we have Redis connections, close them
+        redis_client = getattr(app.state, 'redis', None)
+        if redis_client:
+            await redis_client.close()
+            logger.info("redis_connections_closed")
+    except Exception as e:
+        logger.warning("redis_shutdown_failed", error=str(e))
 
     logger.info("vulnzero_api_shutdown_complete")
 
