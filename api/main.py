@@ -4,6 +4,7 @@ Main FastAPI application for VulnZero platform
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -135,6 +136,13 @@ app.add_middleware(
     allow_credentials=settings.cors_allow_credentials,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+)
+
+# GZip compression middleware - compress responses > 1KB
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=1000,  # Only compress responses larger than 1KB
+    compresslevel=6,    # Compression level (1-9, 6 is good balance)
 )
 
 # Audit logging middleware - enabled based on settings
