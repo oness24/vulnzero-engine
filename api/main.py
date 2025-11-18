@@ -19,6 +19,7 @@ from api.routes import (
     monitoring,
     websocket,
     dashboard,
+    metrics,
 )
 from api.middleware import AuditLogMiddleware
 from shared.config.settings import settings
@@ -28,14 +29,89 @@ logger = structlog.get_logger()
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# Create FastAPI app
+# Create FastAPI app with enhanced OpenAPI documentation
 app = FastAPI(
     title="VulnZero API",
-    description="Automated vulnerability management and patch deployment platform",
+    description="""
+## VulnZero - Automated Vulnerability Management Platform
+
+VulnZero is an AI-powered platform that automatically detects, patches, and deploys
+vulnerability fixes with zero human intervention.
+
+### Features
+
+* **Automated Vulnerability Scanning**: Continuous monitoring from multiple sources
+* **AI-Powered Patch Generation**: LLM-based patch creation with confidence scoring
+* **Digital Twin Testing**: Safe patch testing in isolated environments
+* **Intelligent Deployment**: Canary deployments with automatic rollback
+* **Real-time Monitoring**: WebSocket-based live updates and alerting
+
+### Authentication
+
+All endpoints (except `/health` and documentation) require JWT authentication.
+
+1. **Login**: `POST /api/auth/login` with `{username, password}`
+2. **Get Token**: Receive `access_token` and `refresh_token`
+3. **Use Token**: Include `Authorization: Bearer <access_token>` header
+4. **Refresh**: Use `POST /api/auth/refresh` when token expires
+
+### Rate Limiting
+
+API requests are rate-limited to prevent abuse:
+- **General endpoints**: 100 requests/minute
+- **Write operations**: 30 requests/minute
+- **Authentication**: 10 requests/minute
+
+### Roles
+
+- **Admin**: Full access including user management
+- **Developer**: Access to vulnerabilities, patches, deployments
+- **Viewer**: Read-only access to dashboards and reports
+    """,
     version="1.0.0",
+    terms_of_service="https://vulnzero.io/terms",
+    contact={
+        "name": "VulnZero Support",
+        "email": "support@vulnzero.io",
+        "url": "https://vulnzero.io/support",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    openapi_tags=[
+        {
+            "name": "auth",
+            "description": "Authentication and user management operations",
+        },
+        {
+            "name": "vulnerabilities",
+            "description": "Vulnerability detection and management",
+        },
+        {
+            "name": "patches",
+            "description": "AI-powered patch generation and testing",
+        },
+        {
+            "name": "deployments",
+            "description": "Automated patch deployment and rollback",
+        },
+        {
+            "name": "monitoring",
+            "description": "System health and performance monitoring",
+        },
+        {
+            "name": "dashboard",
+            "description": "Dashboard statistics and analytics",
+        },
+        {
+            "name": "websocket",
+            "description": "Real-time WebSocket connections for live updates",
+        },
+    ],
 )
 
 # Add rate limiter to app state
@@ -212,6 +288,7 @@ app.include_router(deployments.router, prefix="/api")
 app.include_router(monitoring.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(websocket.router, prefix="/api")
+app.include_router(metrics.router, prefix="/api")
 
 
 # Startup event
