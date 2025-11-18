@@ -23,6 +23,24 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="Debug mode")
     log_level: str = Field(default="INFO", description="Logging level")
 
+    @field_validator("environment")
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
+        """Validate environment value"""
+        allowed = ["development", "staging", "production"]
+        if v not in allowed:
+            raise ValueError(f"environment must be one of {allowed}, got '{v}'")
+        return v
+
+    @field_validator("log_level")
+    @classmethod
+    def validate_log_level(cls, v: str) -> str:
+        """Validate log level"""
+        allowed = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v.upper() not in allowed:
+            raise ValueError(f"log_level must be one of {allowed}")
+        return v.upper()
+
     # API Configuration
     api_host: str = Field(default="0.0.0.0", description="API host")
     api_port: int = Field(default=8000, description="API port")
@@ -47,10 +65,30 @@ class Settings(BaseSettings):
     database_max_overflow: int = Field(default=10, description="Max database overflow connections")
     database_echo: bool = Field(default=False, description="Echo SQL queries")
 
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """Validate database URL format"""
+        if not v or not v.strip():
+            raise ValueError("database_url is required and cannot be empty")
+        if not v.startswith('postgresql'):
+            raise ValueError("database_url must use PostgreSQL (postgresql:// or postgresql+asyncpg://)")
+        return v
+
     # Redis
     redis_url: str = Field(description="Redis connection URL")
     redis_password: Optional[str] = Field(default=None, description="Redis password")
     redis_max_connections: int = Field(default=50, description="Max Redis connections")
+
+    @field_validator("redis_url")
+    @classmethod
+    def validate_redis_url(cls, v: str) -> str:
+        """Validate Redis URL format"""
+        if not v or not v.strip():
+            raise ValueError("redis_url is required and cannot be empty")
+        if not v.startswith('redis://'):
+            raise ValueError("redis_url must start with redis://")
+        return v
 
     # Celery
     celery_broker_url: str = Field(description="Celery broker URL")
@@ -68,10 +106,27 @@ class Settings(BaseSettings):
     openai_max_tokens: int = Field(default=4096, description="Max tokens for OpenAI")
     openai_temperature: float = Field(default=0.2, description="Temperature for OpenAI")
 
+    @field_validator("openai_api_key")
+    @classmethod
+    def validate_openai_key(cls, v: Optional[str], info) -> Optional[str]:
+        """Validate OpenAI API key if LLM provider is OpenAI"""
+        # Check if this is the primary LLM provider
+        if v and len(v) < 20:
+            raise ValueError("openai_api_key must be at least 20 characters if provided")
+        return v
+
     # Anthropic
     anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key")
     anthropic_model: str = Field(default="claude-3-sonnet-20240229", description="Anthropic model")
     anthropic_max_tokens: int = Field(default=4096, description="Max tokens for Anthropic")
+
+    @field_validator("anthropic_api_key")
+    @classmethod
+    def validate_anthropic_key(cls, v: Optional[str]) -> Optional[str]:
+        """Validate Anthropic API key"""
+        if v and len(v) < 20:
+            raise ValueError("anthropic_api_key must be at least 20 characters if provided")
+        return v
 
     # Vulnerability Scanners
     # Wazuh
