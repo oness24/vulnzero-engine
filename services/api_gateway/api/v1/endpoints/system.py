@@ -101,3 +101,46 @@ async def system_info(current_user: dict = Depends(get_current_user)):
             "ml_prioritization": settings.feature_ml_prioritization,
         },
     }
+
+
+@router.get(
+    "/deprecations",
+    summary="API Deprecation Information",
+    description="Get information about deprecated API endpoints and sunset dates.",
+)
+async def deprecations():
+    """
+    Get information about deprecated API endpoints.
+
+    Returns:
+        - List of deprecated endpoints
+        - Sunset dates
+        - Alternative endpoints
+        - Current and supported API versions
+
+    Use this endpoint to check if any endpoints you're using are deprecated
+    and plan migrations accordingly.
+    """
+    from shared.api_versioning.versioning import (
+        list_deprecated_endpoints,
+        APIVersion,
+    )
+
+    # Get all deprecated endpoints
+    deprecations = await list_deprecated_endpoints()
+
+    return {
+        "deprecated_endpoints": [
+            {
+                "endpoint": endpoint,
+                "version": info.version,
+                "deprecated_at": info.deprecated_at.isoformat(),
+                "sunset_at": info.sunset_at.isoformat() if info.sunset_at else None,
+                "alternative": info.alternative,
+                "reason": info.reason,
+            }
+            for endpoint, info in deprecations.items()
+        ],
+        "current_version": APIVersion.latest().value,
+        "supported_versions": [v.value for v in APIVersion.all_versions()],
+    }

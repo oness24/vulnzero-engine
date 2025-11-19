@@ -18,6 +18,7 @@ from typing import AsyncGenerator
 
 from shared.config.settings import settings
 from shared.middleware import SecurityHeadersMiddleware, MetricsMiddleware
+from shared.api_versioning import APIVersionMiddleware
 from services.api_gateway.api.v1 import api_router
 from services.api_gateway.core.logging_config import setup_logging
 
@@ -152,6 +153,10 @@ app.add_middleware(
 # Metrics middleware - collects Prometheus metrics for all HTTP requests
 # Tracks request count, duration, errors, and in-progress requests
 app.add_middleware(MetricsMiddleware)
+
+# API Version middleware - handles API version negotiation and tracking
+# Adds version headers and validates API versions
+app.add_middleware(APIVersionMiddleware)
 
 
 # Request timing middleware
