@@ -3,6 +3,8 @@
 **Zero-Touch Vulnerability Remediation. Zero Days of Exposure.**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.9.0--beta-orange.svg)](https://github.com/oness24/vulnzero-engine)
+[![Status](https://img.shields.io/badge/status-beta-yellow.svg)](https://github.com/oness24/vulnzero-engine)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -10,7 +12,7 @@
 
 ## 🚀 Overview
 
-VulnZero is the world's first fully autonomous vulnerability remediation platform that detects, patches, tests, deploys, and validates fixes across your entire infrastructure without human intervention.
+VulnZero is an autonomous vulnerability remediation platform designed to detect, patch, test, deploy, and validate security fixes with minimal human intervention. Currently in **beta development**, the platform provides core functionality for automated vulnerability management with human-in-the-loop controls.
 
 ### Key Features
 
@@ -40,48 +42,128 @@ VulnZero is the world's first fully autonomous vulnerability remediation platfor
 
 ## 🎯 Implementation Status
 
-**Current Phase**: MVP Development (Phase 1 - Months 1-6)
+**Current Version**: v0.9.0-beta
+**Current Phase**: Beta Development - Core Features Implemented
 
-### ✅ Completed Components
+### Component Status
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| **Foundation Setup** | ✅ Complete | Project structure, Docker Compose, dependencies |
-| **Database Schema** | ✅ Complete | PostgreSQL models with SQLAlchemy, Alembic migrations |
-| **API Gateway** | ✅ Complete | FastAPI with JWT auth, RBAC, full CRUD endpoints |
-| **Vulnerability Aggregator** | ✅ Complete | Scanner integration (Wazuh, Qualys, Tenable, CSV), enrichment (NVD, EPSS), ML prioritization |
-| **AI Patch Generator** | ✅ Complete | LLM integration (OpenAI, Anthropic), patch generation, validation, Celery tasks |
-| **Digital Twin Testing** | ✅ Complete | Docker-based testing, 6 health check types, confidence scoring |
-| **Deployment Orchestrator** | ✅ Complete | 3 deployment strategies, Ansible integration, pre/post validators |
-| **Monitoring & Rollback** | ✅ Complete | Real-time monitoring, anomaly detection, automatic rollback, Prometheus integration |
+| **Foundation Setup** | ✅ Stable | Project structure, Docker Compose, dependencies, CI/CD |
+| **Database Schema** | ✅ Stable | PostgreSQL models with SQLAlchemy, Alembic migrations |
+| **API Gateway** | ✅ Functional | FastAPI with JWT auth, RBAC, REST endpoints (64% test coverage) |
+| **Vulnerability Aggregator** | ⚠️ Partial | Scanner integration framework, enrichment APIs (needs integration testing) |
+| **AI Patch Generator** | ⚠️ Partial | LLM client structure, basic patch generation (needs real API testing) |
+| **Digital Twin Testing** | ⚠️ Partial | Docker-based testing framework (complex security requirements) |
+| **Deployment Orchestrator** | ⚠️ Partial | Deployment strategies implemented, Ansible integration (needs validation) |
+| **Monitoring & Rollback** | ✅ Functional | Prometheus metrics, Grafana dashboards, alert framework |
+| **Web Dashboard** | ✅ Functional | React UI with 8 pages, real-time updates via WebSocket |
 
-**Lines of Code**: 15,500+ lines of production-ready Python code
+**Codebase**: ~54,000 lines (Python, JavaScript, YAML, configs)
+**Test Coverage**: 64% (target: 80%+)
+**Production Ready**: Not yet (see [Roadmap to Production](ROADMAP_TO_PRODUCTION.md))
 
-### 🎉 MVP COMPLETE!
+### 🚧 What's Working
 
-**All Phase 1 components implemented!** VulnZero now provides end-to-end autonomous vulnerability remediation.
+- ✅ Full REST API with authentication
+- ✅ Database models and migrations
+- ✅ Celery task queue for async operations
+- ✅ Docker Compose development environment
+- ✅ Basic scanner integration framework
+- ✅ Monitoring and metrics collection
+- ✅ Web dashboard UI
 
-### 🚧 Future Enhancements
+### ⚠️ What Needs Work
 
-| Component | Status | ETA |
-|-----------|--------|-----|
-| **Web Dashboard** | ⏳ Planned | Phase 2 |
-| **Advanced ML Models** | ⏳ Planned | Phase 2 |
-| **Multi-Cloud Support** | ⏳ Planned | Phase 3 |
+- ⚠️ LLM integration requires real API testing
+- ⚠️ Scanner integrations need validation with real instances
+- ⚠️ Digital twin testing has security complexity (Docker-in-Docker)
+- ⚠️ Deployment automation needs production validation
+- ⚠️ Test coverage below 80% target
+- ⚠️ Security hardening incomplete (missing headers, 2FA, etc.)
+- ⚠️ No production deployment runbook
+- ⚠️ Performance benchmarks not established
 
-### 📊 Progress Overview
+### 🎯 Roadmap
+
+| Milestone | Target | Focus |
+|-----------|--------|-------|
+| **v0.9.5** | 4 weeks | Security hardening, test coverage to 80%, bug fixes |
+| **v0.95** | 8 weeks | Production deployment readiness, monitoring, runbooks |
+| **v1.0** | 12 weeks | Performance optimization, HA architecture, documentation |
+
+See [ROADMAP_TO_PRODUCTION.md](ROADMAP_TO_PRODUCTION.md) for detailed timeline.
+
+### 📊 Development Progress
 
 ```
-Phase 1: MVP Development ✅ COMPLETE!
-├── ✅ Phase 1.1: Foundation Setup (Week 1-2)
-├── ✅ Phase 1.2: Database Schema Design
-├── ✅ Phase 1.3: API Gateway Setup
-├── ✅ Phase 1.4: Vulnerability Aggregator (Week 3-4)
-├── ✅ Phase 1.5: AI Patch Generator (Week 5-6)
-├── ✅ Phase 1.6: Digital Twin Testing (Week 7-8)
-├── ✅ Phase 1.7: Deployment Orchestrator (Week 9-10)
-└── ✅ Phase 1.8: Monitoring & Rollback (Week 11-12)
+Phase 1: Core Development (Current) 🚧 ~70% Complete
+├── ✅ Foundation Setup
+├── ✅ Database Schema & Migrations
+├── ✅ API Gateway (needs testing improvements)
+├── ⚠️ Vulnerability Aggregator (needs integration tests)
+├── ⚠️ AI Patch Generator (needs real API validation)
+├── ⚠️ Digital Twin Testing (needs security review)
+├── ⚠️ Deployment Orchestrator (needs validation)
+└── ✅ Monitoring & Rollback Framework
+
+Phase 2: Production Readiness (Next) ⏳ Planned
+├── 🎯 Security hardening
+├── 🎯 Test coverage to 80%+
+├── 🎯 Performance optimization
+├── 🎯 Deployment runbooks
+└── 🎯 High availability architecture
 ```
+
+---
+
+## ⚠️ Known Limitations
+
+**VulnZero is currently in beta**. While core functionality is implemented, the following limitations exist:
+
+### Security & Authentication
+- ❌ No 2FA/MFA support
+- ❌ No API key rotation mechanism
+- ❌ Missing security headers (CSP, HSTS, X-Frame-Options)
+- ⚠️ Default credentials in examples (must be changed)
+
+### Testing & Quality
+- ⚠️ Test coverage at 64% (target: 80%+)
+- ❌ LLM integration not fully tested with real APIs
+- ❌ Scanner integrations need validation with live instances
+- ❌ No load/stress test results documented
+- ❌ E2E tests not running in CI
+
+### Infrastructure & Deployment
+- ❌ No production deployment runbook
+- ❌ No automated database backup solution
+- ❌ No disaster recovery procedures
+- ❌ No Helm charts (only raw Kubernetes manifests)
+- ❌ No Terraform infrastructure-as-code (planned)
+- ⚠️ Docker-in-Docker security concerns for digital twin testing
+
+### Scalability & Performance
+- ⚠️ Single PostgreSQL instance (no replication/sharding)
+- ⚠️ Single Redis instance (no cluster mode)
+- ⚠️ Celery Beat not HA-ready
+- ❌ No performance benchmarks established
+- ❌ No circuit breakers for external API calls
+- ❌ No distributed tracing implemented
+
+### Features
+- ❌ No multi-tenancy support
+- ❌ No SSO/SAML integration
+- ❌ No audit log export functionality
+- ❌ Advanced ML models limited
+- ❌ Multi-cloud support not implemented
+
+### Monitoring & Observability
+- ⚠️ Monitoring alerts configured but not fully tested
+- ❌ No PagerDuty/Opsgenie integration
+- ❌ No SLO/SLA definitions
+- ❌ Error budgets not established
+
+**For production use**, complete the [Roadmap to Production](ROADMAP_TO_PRODUCTION.md) checklist (estimated 10-12 weeks).
 
 ---
 
@@ -150,7 +232,7 @@ VulnZero is built as a microservices platform with the following core components
 │  - ML prioritization       │  - Safety validation            │
 ├────────────────────────────┼─────────────────────────────────┤
 │  Digital Twin Engine       │  Deployment Orchestrator        │
-│  - Sandbox testing         │  - Ansible/Terraform            │
+│  - Sandbox testing         │  - Ansible (Terraform planned)  │
 │  - Automated validation    │  - Multi-strategy deployment    │
 ├────────────────────────────┼─────────────────────────────────┤
 │  Monitoring & Rollback     │  Web Dashboard                  │
@@ -298,28 +380,28 @@ vulnzero-engine/
 │   │   ├── enrichment/          # CVE enrichment (NVD, EPSS, Exploit-DB)
 │   │   ├── ml/                  # ML-based priority scoring
 │   │   └── tasks/               # Celery tasks for scheduled scanning
-│   ├── api-gateway/              # ✅ API Gateway (Complete)
+│   ├── api_gateway/              # ✅ API Gateway (Functional)
 │   │   ├── api/v1/endpoints/   # REST API endpoints
 │   │   ├── core/               # Auth, security, dependencies
 │   │   └── schemas/            # Pydantic request/response models
-│   ├── patch-generator/         # ✅ AI Patch Generator (Complete)
+│   ├── patch_generator/         # ⚠️ AI Patch Generator (Partial)
 │   │   ├── llm/                # LLM integrations (OpenAI, Anthropic)
 │   │   ├── analyzers/          # Vulnerability analysis
 │   │   ├── generators/         # Patch generation
 │   │   ├── validators/         # Patch validation
 │   │   └── tasks/              # Celery tasks
-│   ├── digital-twin/            # ✅ Digital Twin Testing (Complete)
+│   ├── digital_twin/            # ⚠️ Digital Twin Testing (Partial)
 │   │   ├── core/               # Container management, orchestration
 │   │   ├── validators/         # Health checks, test suites
 │   │   ├── analyzers/          # Result analysis
 │   │   └── tasks/              # Celery tasks
-│   ├── deployment-orchestrator/ # ✅ Deployment Orchestrator (Complete)
+│   ├── deployment_orchestrator/ # ⚠️ Deployment Orchestrator (Partial)
 │   │   ├── strategies/         # Deployment strategies (all-at-once, rolling, canary)
 │   │   ├── ansible/            # Ansible integration
 │   │   ├── core/               # Deployment engine
 │   │   ├── validators/         # Pre/post deployment validation
 │   │   └── tasks/              # Celery tasks
-│   └── monitoring/              # ✅ Monitoring & Rollback (Complete)
+│   └── monitoring/              # ✅ Monitoring & Rollback (Functional)
 │       ├── collectors/          # Metrics collection (system, deployment, error)
 │       ├── detectors/           # Anomaly detection (statistical, threshold, pattern)
 │       ├── alerts/              # Alert manager (Slack, Email, Webhook)
@@ -334,10 +416,10 @@ vulnzero-engine/
 │   └── versions/                # Migration scripts
 ├── scripts/                      # Utility scripts
 │   └── seed_database.py         # Database seeding
-├── web/                          # ⏳ React Dashboard (Planned)
+├── web/                          # ✅ React Dashboard (Functional)
 ├── infrastructure/               # Docker & deployment configs
 │   ├── docker-compose.yml       # ✅ Local development setup
-│   └── terraform/               # ⏳ IaC (Planned)
+│   └── kubernetes/              # ✅ K8s manifests (19 files)
 ├── tests/                        # Test suites
 ├── docs/                         # Documentation
 ├── requirements.txt              # ✅ Python dependencies
@@ -621,20 +703,13 @@ docker-compose up -d
 
 ```bash
 # Apply Kubernetes manifests
-kubectl apply -f infrastructure/k8s/
+kubectl apply -f infrastructure/kubernetes/
 
-# Or use Helm
-helm install vulnzero infrastructure/helm/vulnzero
+# Note: Helm charts not yet available (planned for v1.0)
+# Note: Terraform IaC planned but not yet implemented
 ```
 
-### Terraform (AWS Infrastructure)
-
-```bash
-cd infrastructure/terraform/aws
-terraform init
-terraform plan
-terraform apply
-```
+> ⚠️ **Production Deployment**: Not fully validated yet. See [ROADMAP_TO_PRODUCTION.md](ROADMAP_TO_PRODUCTION.md) for production readiness checklist.
 
 See [Deployment Guide](docs/guides/deployment.md) for detailed instructions.
 
@@ -758,10 +833,10 @@ Open your browser to `http://localhost:3000`
 - Socket.io (real-time updates)
 
 **Infrastructure**
-- Docker & Kubernetes
-- Terraform (IaC)
+- Docker & Kubernetes (19 manifests)
 - Ansible (configuration management)
 - Prometheus & Grafana (monitoring)
+- Terraform (planned for v1.0)
 
 **AI/ML**
 - OpenAI GPT-4 / Anthropic Claude
