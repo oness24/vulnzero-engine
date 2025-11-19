@@ -38,6 +38,13 @@ from shared.monitoring.metrics import (
     llm_api_duration_seconds,
     llm_tokens_used_total,
 
+    # Event bus metrics
+    events_published_total,
+    events_consumed_total,
+    event_processing_duration_seconds,
+    event_processing_errors_total,
+    event_queue_depth,
+
     # Decorators and helpers
     track_time,
     track_in_progress,
@@ -87,6 +94,13 @@ __all__ = [
     "llm_api_calls_total",
     "llm_api_duration_seconds",
     "llm_tokens_used_total",
+
+    # Event bus metrics
+    "events_published_total",
+    "events_consumed_total",
+    "event_processing_duration_seconds",
+    "event_processing_errors_total",
+    "event_queue_depth",
 
     # Decorators and helpers
     "track_time",
