@@ -27,6 +27,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     # Startup
     logger.info("🚀 Starting Patch Generator Service...")
 
+    # Initialize Sentry error tracking
+    try:
+        from shared.monitoring.sentry_config import init_sentry_for_environment
+        import os
+        environment = os.getenv("ENVIRONMENT", "development")
+        release = os.getenv("RELEASE_VERSION") or os.getenv("GIT_COMMIT_SHA")
+        if init_sentry_for_environment(environment, release=release):
+            logger.info(f"✓ Sentry initialized (environment={environment})")
+    except Exception as e:
+        logger.warning(f"⚠ Sentry initialization failed: {e}")
+
     # Setup tracing
     try:
         setup_tracing("patch-generator-service")
