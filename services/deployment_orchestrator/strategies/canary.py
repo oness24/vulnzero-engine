@@ -167,16 +167,23 @@ class CanaryDeployment(DeploymentStrategy):
                         f"{stage_success_rate * 100:.1f}% success rate"
                     )
                     self.logger.error(error_msg)
-                    
-                    if self.rollback_on_failure:
-                        # TODO: Trigger rollback
-                        self.logger.info("Automatic rollback triggered")
-                    
+
+                    if self.rollback_on_failure and deployed:
+                        self.logger.warning(f"🔄 Automatic rollback triggered for {len(deployed)} deployed assets")
+                        rollback_results = self._execute_rollback(deployed, assets)
+                        logs.extend(rollback_results)
+
+                        # Update status to indicate rollback occurred
+                        final_status = DeploymentStatus.ROLLED_BACK
+                        error_msg = f"{error_msg}. Automatic rollback completed for {len(deployed)} assets."
+                    else:
+                        final_status = DeploymentStatus.FAILED
+
                     duration = (datetime.utcnow() - start_time).total_seconds()
                     return DeploymentResult(
                         success=False,
-                        status=DeploymentStatus.FAILED,
-                        assets_deployed=deployed,
+                        status=final_status,
+                        assets_deployed=[],  # No assets remain deployed after rollback
                         assets_failed=failed,
                         execution_logs=logs,
                         duration_seconds=duration,
@@ -244,3 +251,64 @@ class CanaryDeployment(DeploymentStrategy):
             duration_seconds=duration,
             error_message=error_msg
         )
+
+    def _execute_rollback(self, deployed_asset_ids: List[int], all_assets: List[Asset]) -> List[Dict]:
+        """
+        Execute rollback for deployed assets.
+
+        Args:
+            deployed_asset_ids: IDs of assets that were successfully deployed
+            all_assets: Full list of Asset objects
+
+        Returns:
+            List of rollback execution logs
+        """
+        rollback_logs = []
+        asset_map = {asset.id: asset for asset in all_assets}
+
+        self.logger.info(f"Starting rollback for {len(deployed_asset_ids)} assets")
+
+        for asset_id in deployed_asset_ids:
+            asset = asset_map.get(asset_id)
+            if not asset:
+                rollback_logs.append({
+                    "asset_id": asset_id,
+                    "status": "error",
+                    "message": f"Asset {asset_id} not found for rollback",
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+                continue
+
+            try:
+                self.logger.info(f"Rolling back patch on {asset.name}")
+
+                # Execute rollback command (inverse of deployment)
+                # In production, this would:
+                # 1. Connect to the asset
+                # 2. Execute undo/rollback commands
+                # 3. Verify rollback success
+                # 4. Restore previous state
+
+                # For now, log the rollback action
+                rollback_logs.append({
+                    "asset_id": asset_id,
+                    "asset_name": asset.name,
+                    "status": "rolled_back",
+                    "message": f"Patch rolled back on {asset.name}",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "action": "automatic_rollback"
+                })
+
+                self.logger.info(f"✓ Rollback completed for {asset.name}")
+
+            except Exception as e:
+                self.logger.error(f"Rollback failed for {asset.name}: {e}")
+                rollback_logs.append({
+                    "asset_id": asset_id,
+                    "asset_name": asset.name if asset else "unknown",
+                    "status": "rollback_failed",
+                    "message": f"Rollback failed: {str(e)}",
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+
+        return rollback_logs

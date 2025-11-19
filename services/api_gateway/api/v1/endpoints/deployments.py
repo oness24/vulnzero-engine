@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import Optional, List
 from datetime import datetime
+import logging
 
 from services.api_gateway.core.dependencies import get_db
 from services.api_gateway.core.security import get_current_user, require_role
@@ -22,7 +23,11 @@ from shared.models.deployment import DeploymentStatus, DeploymentStrategy
 from shared.models.patch import PatchStatus
 from shared.models.audit_log import AuditAction, AuditResourceType
 
+# Import Celery tasks for async execution
+from services.deployment_orchestrator.tasks.deployment_tasks import deploy_patch as deploy_patch_task, rollback_deployment
+
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get(
@@ -172,9 +177,14 @@ async def create_deployment(
     db.commit()
     db.refresh(new_deployment)
 
-    # TODO: Trigger Celery task for actual deployment
-    # from services.deployment_manager.tasks import deploy_patch
-    # task = deploy_patch.delay(deployment_id=new_deployment.id)
+    # Trigger async deployment via Celery
+    task = deploy_patch_task.delay(
+        patch_id=new_deployment.patch_id,
+        asset_ids=[new_deployment.asset_id],
+        strategy=new_deployment.strategy or "all-at-once",
+        user_id=current_user["id"]
+    )
+    logger.info(f"Deployment task triggered: {task.id} for deployment {new_deployment.id}")
 
     return DeploymentResponse.from_orm(new_deployment)
 
@@ -392,9 +402,13 @@ async def rollback_deployment(
     db.commit()
     db.refresh(deployment)
 
-    # TODO: Trigger Celery task for actual rollback
-    # from services.deployment_manager.tasks import rollback_deployment_task
-    # task = rollback_deployment_task.delay(deployment_id=deployment.id)
+    # Trigger async rollback via Celery
+    task = rollback_deployment.delay(
+        deployment_id=deployment.id,
+        reason=reason or "Manual rollback requested",
+        user_id=current_user["id"]
+    )
+    logger.info(f"Rollback task triggered: {task.id} for deployment {deployment.id}")
 
     return DeploymentResponse.from_orm(deployment)
 
@@ -483,9 +497,14 @@ async def deploy_patch(
     db.commit()
     db.refresh(new_deployment)
 
-    # TODO: Trigger Celery task for actual deployment
-    # from services.deployment_manager.tasks import deploy_patch_task
-    # task = deploy_patch_task.delay(deployment_id=new_deployment.id)
+    # Trigger async deployment via Celery
+    task = deploy_patch_task.delay(
+        patch_id=new_deployment.patch_id,
+        asset_ids=[new_deployment.asset_id],
+        strategy=new_deployment.strategy or "immediate",
+        user_id=current_user["id"]
+    )
+    logger.info(f"Quick deployment task triggered: {task.id} for deployment {new_deployment.id}")
 
     return DeploymentResponse.from_orm(new_deployment)
 
