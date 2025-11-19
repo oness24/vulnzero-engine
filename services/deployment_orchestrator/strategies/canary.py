@@ -254,7 +254,7 @@ class CanaryDeployment(DeploymentStrategy):
 
     def _execute_rollback(self, deployed_asset_ids: List[int], all_assets: List[Asset]) -> List[Dict]:
         """
-        Execute rollback for deployed assets.
+        Execute ACTUAL rollback for deployed assets using RollbackManager.
 
         Args:
             deployed_asset_ids: IDs of assets that were successfully deployed
@@ -263,10 +263,13 @@ class CanaryDeployment(DeploymentStrategy):
         Returns:
             List of rollback execution logs
         """
+        from services.deployment_orchestrator.core.rollback_manager import RollbackManager
+
         rollback_logs = []
         asset_map = {asset.id: asset for asset in all_assets}
+        rollback_manager = RollbackManager()
 
-        self.logger.info(f"Starting rollback for {len(deployed_asset_ids)} assets")
+        self.logger.info(f"Starting ACTUAL rollback for {len(deployed_asset_ids)} assets")
 
         for asset_id in deployed_asset_ids:
             asset = asset_map.get(asset_id)
@@ -280,35 +283,42 @@ class CanaryDeployment(DeploymentStrategy):
                 continue
 
             try:
-                self.logger.info(f"Rolling back patch on {asset.name}")
+                self.logger.info(f"🔄 Rolling back patch {self.patch.id} on {asset.name}")
 
-                # Execute rollback command (inverse of deployment)
-                # In production, this would:
-                # 1. Connect to the asset
-                # 2. Execute undo/rollback commands
-                # 3. Verify rollback success
-                # 4. Restore previous state
+                # Execute REAL rollback using RollbackManager
+                result = rollback_manager.rollback_patch(
+                    asset=asset,
+                    patch=self.patch,
+                    deployment=None  # Could pass deployment object if available
+                )
 
-                # For now, log the rollback action
-                rollback_logs.append({
-                    "asset_id": asset_id,
-                    "asset_name": asset.name,
-                    "status": "rolled_back",
-                    "message": f"Patch rolled back on {asset.name}",
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "action": "automatic_rollback"
-                })
+                # Convert result to log format
+                rollback_logs.append(result.to_dict())
 
-                self.logger.info(f"✓ Rollback completed for {asset.name}")
+                if result.success:
+                    self.logger.info(
+                        f"✅ Rollback successful for {asset.name} "
+                        f"using strategy: {result.strategy_used.value}"
+                    )
+                else:
+                    self.logger.error(
+                        f"❌ Rollback failed for {asset.name}: {result.message}"
+                    )
 
             except Exception as e:
-                self.logger.error(f"Rollback failed for {asset.name}: {e}")
+                self.logger.exception(f"Rollback exception for {asset.name}: {e}")
                 rollback_logs.append({
                     "asset_id": asset_id,
                     "asset_name": asset.name if asset else "unknown",
                     "status": "rollback_failed",
-                    "message": f"Rollback failed: {str(e)}",
+                    "message": f"Exception during rollback: {str(e)}",
                     "timestamp": datetime.utcnow().isoformat()
                 })
+
+        # Summary logging
+        successful_rollbacks = sum(1 for log in rollback_logs if log.get("success"))
+        self.logger.info(
+            f"Rollback summary: {successful_rollbacks}/{len(deployed_asset_ids)} successful"
+        )
 
         return rollback_logs
