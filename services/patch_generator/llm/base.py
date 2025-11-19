@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 import logging
+from shared.utils import sanitize_llm_message_content, is_injection_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +93,42 @@ class BaseLLMClient(ABC):
         """Create a system message"""
         return LLMMessage(role="system", content=content)
 
-    def create_user_message(self, content: str) -> LLMMessage:
-        """Create a user message"""
+    def create_user_message(self, content: str, sanitize: bool = True) -> LLMMessage:
+        """
+        Create a user message with optional sanitization.
+
+        User messages should be sanitized if they come from untrusted sources
+        (user input, external APIs, etc.) to prevent prompt injection attacks.
+
+        Args:
+            content: User message content
+            sanitize: Whether to sanitize content (default: True)
+
+        Returns:
+            LLMMessage with user role and sanitized content
+        """
+        if sanitize:
+            # Check for injection attempts
+            if is_injection_attempt(content):
+                self.logger.warning(
+                    "Potential prompt injection detected in user message",
+                    extra={"content_preview": content[:100]}
+                )
+
+            # Sanitize content
+            sanitized_content = sanitize_llm_message_content(content)
+
+            if sanitized_content != content:
+                self.logger.info(
+                    "User message content was sanitized",
+                    extra={
+                        "original_length": len(content),
+                        "sanitized_length": len(sanitized_content)
+                    }
+                )
+
+            content = sanitized_content
+
         return LLMMessage(role="user", content=content)
 
     def create_assistant_message(self, content: str) -> LLMMessage:

@@ -39,6 +39,13 @@ from shared.utils.response_helpers import (
     PaginationMeta,
 )
 
+from shared.utils.llm_sanitizer import (
+    sanitize_prompt,
+    sanitize_llm_message_content,
+    is_injection_attempt,
+    SanitizationLevel,
+)
+
 __all__ = [
     # Error handling
     "ErrorCode",
@@ -67,4 +74,9 @@ __all__ = [
     "ErrorResponse",
     "PaginatedResponse",
     "PaginationMeta",
+    # LLM Security
+    "sanitize_prompt",
+    "sanitize_llm_message_content",
+    "is_injection_attempt",
+    "SanitizationLevel",
 ]
