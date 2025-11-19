@@ -22,7 +22,7 @@ from api.routes import (
     dashboard,
     metrics,
 )
-from api.middleware import AuditLogMiddleware
+from api.middleware import AuditLogMiddleware, SecurityHeadersMiddleware
 from shared.config.settings import settings
 
 logger = structlog.get_logger()
@@ -144,6 +144,13 @@ app.add_middleware(
     GZipMiddleware,
     minimum_size=1000,  # Only compress responses larger than 1KB
     compresslevel=6,    # Compression level (1-9, 6 is good balance)
+)
+
+# Security Headers middleware - adds comprehensive security headers to all responses
+# Protects against XSS, clickjacking, MIME-sniffing, and other common vulnerabilities
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    is_production=settings.is_production
 )
 
 # Audit logging middleware - enabled based on settings

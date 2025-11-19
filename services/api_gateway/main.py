@@ -17,6 +17,7 @@ import logging
 from typing import AsyncGenerator
 
 from shared.config.settings import settings
+from shared.middleware import SecurityHeadersMiddleware
 from services.api_gateway.api.v1 import api_router
 from services.api_gateway.core.logging_config import setup_logging
 
@@ -106,6 +107,13 @@ app.add_middleware(
 
 # GZip Middleware - Compress responses
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Security Headers middleware - adds comprehensive security headers to all responses
+# Protects against XSS, clickjacking, MIME-sniffing, and other common vulnerabilities
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    is_production=settings.is_production
+)
 
 
 # Request timing middleware
