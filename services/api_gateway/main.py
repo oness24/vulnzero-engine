@@ -17,7 +17,7 @@ import logging
 from typing import AsyncGenerator
 
 from shared.config.settings import settings
-from shared.middleware import SecurityHeadersMiddleware
+from shared.middleware import SecurityHeadersMiddleware, MetricsMiddleware
 from services.api_gateway.api.v1 import api_router
 from services.api_gateway.core.logging_config import setup_logging
 
@@ -40,6 +40,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"API Docs: http://localhost:8000/docs")
+
+    # Initialize metrics
+    try:
+        from shared.monitoring import update_application_info
+        update_application_info()
+        logger.info("✓ Prometheus metrics initialized")
+    except Exception as e:
+        logger.warning(f"⚠ Metrics initialization failed (non-critical): {e}")
 
     # Initialize connections
     try:
@@ -140,6 +148,10 @@ app.add_middleware(
     SecurityHeadersMiddleware,
     is_production=settings.is_production
 )
+
+# Metrics middleware - collects Prometheus metrics for all HTTP requests
+# Tracks request count, duration, errors, and in-progress requests
+app.add_middleware(MetricsMiddleware)
 
 
 # Request timing middleware

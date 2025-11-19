@@ -5,32 +5,16 @@ Health checks and metrics
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
-from prometheus_client import (
-    Counter,
-    Histogram,
-    generate_latest,
-    CONTENT_TYPE_LATEST,
-)
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from sqlalchemy.orm import Session
 import time
+import logging
 
 from services.api_gateway.core.dependencies import get_db
 from services.api_gateway.core.security import get_current_user
 
 router = APIRouter()
-
-# Prometheus metrics
-request_counter = Counter(
-    "vulnzero_api_requests_total",
-    "Total API requests",
-    ["method", "endpoint", "status"]
-)
-
-request_duration = Histogram(
-    "vulnzero_api_request_duration_seconds",
-    "API request duration in seconds",
-    ["method", "endpoint"]
-)
+logger = logging.getLogger(__name__)
 
 
 @router.get(
@@ -71,8 +55,26 @@ async def health_check(db: Session = Depends(get_db)):
 async def metrics():
     """
     Prometheus metrics endpoint.
-    Returns metrics in Prometheus format.
+    Returns all application metrics in Prometheus format.
+
+    Metrics include:
+    - HTTP request metrics (count, duration, errors, in-progress)
+    - Database metrics (queries, connection pool, slow queries)
+    - Cache metrics (hits, misses, operations, memory)
+    - Business metrics (vulnerabilities, patches, deployments)
+    - Celery task metrics (tasks, duration, queue length, workers)
+    - LLM API metrics (calls, tokens, duration)
     """
+    # Update dynamic metrics before exporting
+    try:
+        from shared.monitoring import update_db_pool_metrics
+
+        update_db_pool_metrics()
+        # Cache and Celery metrics are updated via background tasks
+
+    except Exception as e:
+        logger.warning(f"Failed to update dynamic metrics: {e}")
+
     return PlainTextResponse(
         content=generate_latest().decode("utf-8"),
         media_type=CONTENT_TYPE_LATEST,
