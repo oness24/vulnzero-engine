@@ -130,3 +130,92 @@ jobs:
       run: |
         pip install -r requirements.txt
         safety check --json || true
+
+  integration-tests:
+    name: Integration Tests (Celery + Database)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: vulnzero_test
+          POSTGRES_PASSWORD: testpass123
+          POSTGRES_DB: vulnzero_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        pip install pytest pytest-cov pytest-asyncio pytest-mock celery[redis]
+
+    - name: Set up test environment variables
+      run: |
+        echo "DATABASE_URL=postgresql://vulnzero_test:testpass123@localhost:5432/vulnzero_test" >> $GITHUB_ENV
+        echo "REDIS_URL=redis://localhost:6379/0" >> $GITHUB_ENV
+        echo "CELERY_BROKER_URL=redis://localhost:6379/0" >> $GITHUB_ENV
+        echo "CELERY_RESULT_BACKEND=redis://localhost:6379/1" >> $GITHUB_ENV
+        echo "TESTING=true" >> $GITHUB_ENV
+
+    - name: Run database migrations
+      run: |
+        # Skip migrations for in-memory SQLite tests
+        echo "Using in-memory SQLite for integration tests"
+
+    - name: Run Celery integration tests
+      run: |
+        python -m pytest tests/integration/test_celery_tasks.py -v \
+          --tb=short \
+          --cov=services/deployment_orchestrator \
+          --cov=services/aggregator \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          -m integration
+
+    - name: Run all integration tests
+      run: |
+        python -m pytest tests/integration/ -v \
+          --tb=short \
+          --cov=services \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          --ignore=tests/integration/test_performance.py
+
+    - name: Upload integration test coverage
+      uses: codecov/codecov-action@v4
+      if: always()
+      with:
+        file: ./coverage.xml
+        flags: integration
+        name: integration-tests
+        fail_ci_if_error: false
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

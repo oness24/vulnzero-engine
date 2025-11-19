@@ -655,3 +655,132 @@ async def multiple_vulnerabilities(db_session: AsyncSession) -> list[Vulnerabili
         await db_session.refresh(vuln)
 
     return vulnerabilities
+
+
+# =============================================================================
+# Celery Integration Test Fixtures
+# =============================================================================
+
+@pytest.fixture(scope="session")
+def celery_config():
+    """
+    Celery configuration for testing.
+    
+    Uses in-memory broker and result backend for fast tests.
+    """
+    return {
+        "broker_url": "memory://",
+        "result_backend": "cache+memory://",
+        "task_always_eager": True,  # Execute tasks synchronously for testing
+        "task_eager_propagates": True,  # Propagate exceptions
+        "task_store_eager_result": True,  # Store results even in eager mode
+        "result_expires": 600,  # Results expire after 10 minutes
+    }
+
+
+@pytest.fixture(scope="session")
+def celery_enable_logging():
+    """Enable Celery logging in tests"""
+    return True
+
+
+@pytest.fixture(scope="session")
+def celery_worker_pool():
+    """Use solo pool for single-threaded test execution"""
+    return "solo"
+
+
+@pytest.fixture
+def celery_app(celery_config):
+    """
+    Create Celery app for testing.
+    
+    Uses eager mode so tasks execute synchronously in the test process.
+    """
+    from celery import Celery
+    
+    app = Celery("test_app")
+    app.config_from_object(celery_config)
+    
+    # Register tasks
+    try:
+        from services.deployment_orchestrator.tasks.deployment_tasks import deploy_patch, rollback_deployment
+        from services.aggregator.tasks.scan_tasks import scan_wazuh, scan_qualys, scan_tenable
+    except ImportError:
+        pass  # Tasks will be registered when modules are imported
+    
+    return app
+
+
+@pytest.fixture
+def mock_ssh_connection():
+    """Mock SSH connection for deployment tests"""
+    from unittest.mock import MagicMock
+    
+    mock_conn = MagicMock()
+    mock_conn.connect.return_value = True
+    mock_conn.execute_command.return_value = {
+        "success": True,
+        "exit_code": 0,
+        "stdout": "Command executed successfully",
+        "stderr": ""
+    }
+    mock_conn.disconnect.return_value = None
+    
+    return mock_conn
+
+
+@pytest.fixture
+def approved_patch(test_db: Session, sample_vulnerability: Vulnerability) -> Patch:
+    """Create an approved patch ready for deployment"""
+    patch = Patch(
+        vulnerability_id=sample_vulnerability.id,
+        title="Approved Security Patch",
+        description="Production-ready security patch",
+        patch_type=PatchType.PACKAGE_UPDATE,
+        patch_content="#!/bin/bash\napt-get update && apt-get install -y security-patch-1.2.3",
+        rollback_script="#!/bin/bash\napt-get install -y --allow-downgrades security-patch-1.0.0",
+        patch_metadata={
+            "service_name": "webapp",
+            "package_name": "security-patch",
+            "previous_version": "1.0.0",
+            "new_version": "1.2.3"
+        },
+        status=PatchStatus.APPROVED,
+        confidence_score=92.5,
+        validation_passed=True,
+        test_status="passed",
+        llm_provider="openai",
+        llm_model="gpt-4"
+    )
+    test_db.add(patch)
+    test_db.commit()
+    test_db.refresh(patch)
+    return patch
+
+
+@pytest.fixture
+def deployable_asset(test_db: Session) -> Asset:
+    """Create an asset ready for deployment with SSH credentials"""
+    asset = Asset(
+        asset_id="deploy-asset-001",
+        name="Production Server 01",
+        hostname="prod-server-01.example.com",
+        ip_address="10.0.1.100",
+        type=AssetType.SERVER,
+        status=AssetStatus.ACTIVE,
+        os_type="Ubuntu",
+        os_version="22.04",
+        ssh_user="deploy",
+        ssh_port=22,
+        ssh_key_path="/path/to/key.pem",
+        asset_metadata={
+            "environment": "production",
+            "region": "us-east-1",
+            "criticality": "high"
+        }
+    )
+    test_db.add(asset)
+    test_db.commit()
+    test_db.refresh(asset)
+    return asset
