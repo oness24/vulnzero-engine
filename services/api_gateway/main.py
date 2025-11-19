@@ -19,6 +19,7 @@ from typing import AsyncGenerator
 from shared.config.settings import settings
 from services.api_gateway.api.v1 import api_router
 from services.api_gateway.core.logging_config import setup_logging
+from services.api_gateway.middleware.security_headers import SecurityHeadersMiddleware, CORSSecurityMiddleware
 
 # Setup logging
 setup_logging()
@@ -106,6 +107,12 @@ app.add_middleware(
 
 # GZip Middleware - Compress responses
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Security Headers Middleware - Add security headers to all responses
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS Security Logging Middleware - Log suspicious CORS requests
+app.add_middleware(CORSSecurityMiddleware)
 
 
 # Request timing middleware
