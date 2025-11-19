@@ -135,9 +135,37 @@ async def trigger_scan(
     Trigger manual vulnerability scan.
     Requires operator or admin role.
     """
-    # TODO: Trigger Celery task for vulnerability scanning
-    # from services.aggregator.tasks import scan_vulnerabilities
-    # task = scan_vulnerabilities.delay(scanner=scanner)
+    # Trigger Celery task(s) for vulnerability scanning
+    from services.aggregator.tasks.scan_tasks import scan_wazuh, scan_qualys, scan_tenable
+
+    task_ids = []
+    scanners_triggered = []
+
+    if scanner == "wazuh":
+        task = scan_wazuh.delay()
+        task_ids.append(task.id)
+        scanners_triggered.append("wazuh")
+    elif scanner == "qualys":
+        task = scan_qualys.delay()
+        task_ids.append(task.id)
+        scanners_triggered.append("qualys")
+    elif scanner == "tenable":
+        task = scan_tenable.delay()
+        task_ids.append(task.id)
+        scanners_triggered.append("tenable")
+    else:
+        # Trigger all scanners
+        task = scan_wazuh.delay()
+        task_ids.append(task.id)
+        scanners_triggered.append("wazuh")
+
+        task = scan_qualys.delay()
+        task_ids.append(task.id)
+        scanners_triggered.append("qualys")
+
+        task = scan_tenable.delay()
+        task_ids.append(task.id)
+        scanners_triggered.append("tenable")
 
     # Create audit log
     audit_log = AuditLog(
@@ -159,8 +187,9 @@ async def trigger_scan(
     return {
         "message": "Vulnerability scan triggered successfully",
         "scanner": scanner or "all",
+        "scanners_triggered": scanners_triggered,
         "triggered_by": current_user.get("email"),
-        # "task_id": task.id  # Uncomment when Celery is integrated
+        "task_ids": task_ids,
     }
 
 

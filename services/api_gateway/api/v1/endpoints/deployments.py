@@ -172,9 +172,22 @@ async def create_deployment(
     db.commit()
     db.refresh(new_deployment)
 
-    # TODO: Trigger Celery task for actual deployment
-    # from services.deployment_manager.tasks import deploy_patch
-    # task = deploy_patch.delay(deployment_id=new_deployment.id)
+    # Trigger Celery task for actual deployment
+    from services.deployment_orchestrator.tasks.deployment_tasks import deploy_patch as deploy_patch_task
+
+    task = deploy_patch_task.delay(
+        patch_id=new_deployment.patch_id,
+        asset_ids=[new_deployment.asset_id],
+        strategy=deployment_data.strategy,
+        user_id=current_user["id"]
+    )
+
+    # Store task ID in metadata for tracking
+    new_deployment.deployment_metadata = {
+        **(new_deployment.deployment_metadata or {}),
+        "celery_task_id": task.id
+    }
+    db.commit()
 
     return DeploymentResponse.from_orm(new_deployment)
 
@@ -392,9 +405,20 @@ async def rollback_deployment(
     db.commit()
     db.refresh(deployment)
 
-    # TODO: Trigger Celery task for actual rollback
-    # from services.deployment_manager.tasks import rollback_deployment_task
-    # task = rollback_deployment_task.delay(deployment_id=deployment.id)
+    # Trigger Celery task for actual rollback
+    from services.deployment_orchestrator.tasks.deployment_tasks import rollback_deployment as rollback_deployment_task
+
+    task = rollback_deployment_task.delay(
+        deployment_id=deployment.id,
+        user_id=current_user["id"]
+    )
+
+    # Store rollback task ID in metadata
+    deployment.deployment_metadata = {
+        **(deployment.deployment_metadata or {}),
+        "rollback_task_id": task.id
+    }
+    db.commit()
 
     return DeploymentResponse.from_orm(deployment)
 
@@ -483,9 +507,22 @@ async def deploy_patch(
     db.commit()
     db.refresh(new_deployment)
 
-    # TODO: Trigger Celery task for actual deployment
-    # from services.deployment_manager.tasks import deploy_patch_task
-    # task = deploy_patch_task.delay(deployment_id=new_deployment.id)
+    # Trigger Celery task for actual deployment
+    from services.deployment_orchestrator.tasks.deployment_tasks import deploy_patch as deploy_patch_task
+
+    task = deploy_patch_task.delay(
+        patch_id=new_deployment.patch_id,
+        asset_ids=[new_deployment.asset_id],
+        strategy=strategy,
+        user_id=current_user["id"]
+    )
+
+    # Store task ID in metadata for tracking
+    new_deployment.deployment_metadata = {
+        **(new_deployment.deployment_metadata or {}),
+        "celery_task_id": task.id
+    }
+    db.commit()
 
     return DeploymentResponse.from_orm(new_deployment)
 
