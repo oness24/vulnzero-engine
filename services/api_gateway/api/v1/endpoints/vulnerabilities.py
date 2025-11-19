@@ -3,11 +3,13 @@ VulnZero API Gateway - Vulnerability Endpoints (Full Implementation)
 Complete CRUD operations for vulnerabilities with database queries
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import Optional, List
 from datetime import datetime
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from services.api_gateway.core.dependencies import get_db
 from services.api_gateway.core.security import get_current_user, require_role
@@ -27,6 +29,9 @@ import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Initialize rate limiter for this router
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get(
@@ -131,13 +136,25 @@ async def get_vulnerability(
     summary="Trigger Vulnerability Scan",
     description="Manually trigger a vulnerability scan for all assets.",
 )
+@limiter.limit("5/hour")  # Rate limit: 5 scans per hour per IP
 async def trigger_scan(
+    request: Request,  # Required for rate limiting
     scanner: Optional[str] = Query(None, description="Specific scanner to use (wazuh, qualys, tenable)"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("operator")),
 ):
     """
     Trigger manual vulnerability scan.
+
+    **Rate Limited**: 5 scans per hour per IP address to prevent abuse.
+
+    Vulnerability scanning can be expensive (API costs, resource usage),
+    so this endpoint is rate-limited to prevent:
+    - Accidental scan spam
+    - Malicious resource exhaustion
+    - Exceeding external scanner API limits
+    - Unnecessary costs
+
     Requires operator or admin role.
     """
     # Trigger appropriate scanner based on parameter

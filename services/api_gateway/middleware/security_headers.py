@@ -10,6 +10,8 @@ from starlette.requests import Request
 from starlette.responses import Response
 import logging
 
+from shared.config.settings import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,6 +102,17 @@ class CORSSecurityMiddleware(BaseHTTPMiddleware):
     this middleware adds security logging for CORS violations.
     """
 
+    def __init__(self, app):
+        """
+        Initialize CORS security middleware.
+
+        Loads allowed origins from application settings.
+        """
+        super().__init__(app)
+        # Load allowed origins from configuration
+        self.allowed_origins = set(settings.cors_origins_list)
+        logger.info(f"CORSSecurityMiddleware initialized with {len(self.allowed_origins)} allowed origins")
+
     async def dispatch(self, request: Request, call_next):
         """Log potential CORS violations"""
         origin = request.headers.get("origin")
@@ -108,7 +121,13 @@ class CORSSecurityMiddleware(BaseHTTPMiddleware):
         if origin and not self._is_allowed_origin(origin):
             logger.warning(
                 f"Request from unauthorized origin: {origin} "
-                f"to {request.url.path} from {request.client.host if request.client else 'unknown'}"
+                f"to {request.url.path} from {request.client.host if request.client else 'unknown'}",
+                extra={
+                    "origin": origin,
+                    "path": request.url.path,
+                    "client_ip": request.client.host if request.client else None,
+                    "allowed_origins": list(self.allowed_origins)[:5]  # Log first 5 for debugging
+                }
             )
 
         response = await call_next(request)
@@ -116,18 +135,16 @@ class CORSSecurityMiddleware(BaseHTTPMiddleware):
 
     def _is_allowed_origin(self, origin: str) -> bool:
         """
-        Check if origin is allowed.
+        Check if origin is allowed using exact match.
 
-        In production, this should check against your configured allowed origins.
-        For now, we'll log all cross-origin requests for monitoring.
+        Uses configured CORS origins from settings instead of hardcoded values.
+        Performs exact string matching for security (not prefix matching).
+
+        Args:
+            origin: Origin header value from request
+
+        Returns:
+            True if origin is in allowed list, False otherwise
         """
-        # Localhost and same-origin are always allowed
-        if (
-            origin.startswith("http://localhost")
-            or origin.startswith("http://127.0.0.1")
-            or origin.startswith("https://vulnzero.com")
-            or origin.startswith("https://app.vulnzero.com")
-        ):
-            return True
-
-        return False
+        # Exact match against configured origins
+        return origin in self.allowed_origins

@@ -12,6 +12,7 @@ from services.api_gateway.api.v1.endpoints import (
     patches,
     deployments,
     system,
+    tasks,
 )
 
 # Create main API router
@@ -24,5 +25,6 @@ api_router.include_router(assets.router, prefix="/assets", tags=["Assets"])
 api_router.include_router(patches.router, prefix="/patches", tags=["Patches"])
 api_router.include_router(deployments.router, prefix="/deployments", tags=["Deployments"])
 api_router.include_router(system.router, prefix="/system", tags=["System"])
+api_router.include_router(tasks.router, prefix="/tasks", tags=["Tasks"])
 
 __all__ = ["api_router"]
