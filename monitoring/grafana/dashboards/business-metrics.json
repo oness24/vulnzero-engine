@@ -1,0 +1,266 @@
+{
+  "dashboard": {
+    "title": "VulnZero - Business Metrics",
+    "tags": ["vulnzero", "business", "vulnerabilities", "patches"],
+    "timezone": "browser",
+    "editable": true,
+    "graphTooltip": 1,
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+        "type": "stat",
+        "title": "Active Vulnerabilities",
+        "targets": [
+          {
+            "expr": "sum(vulnzero_vulnerabilities_active)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 10, "color": "yellow"},
+                {"value": 50, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+        "type": "stat",
+        "title": "Critical Vulnerabilities",
+        "targets": [
+          {
+            "expr": "vulnzero_vulnerabilities_active{severity=\"critical\"}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+        "type": "stat",
+        "title": "Patches Generated (24h)",
+        "targets": [
+          {
+            "expr": "sum(increase(vulnzero_patches_generated_total[24h]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+        "type": "stat",
+        "title": "Deployments (24h)",
+        "targets": [
+          {
+            "expr": "sum(increase(vulnzero_deployments_total{status=\"success\"}[24h]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+        "type": "graph",
+        "title": "Vulnerabilities Detected per Hour",
+        "targets": [
+          {
+            "expr": "sum(rate(vulnzero_vulnerabilities_detected_total[1h])) by (severity)",
+            "legendFormat": "{{severity}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Vulnerabilities/hour"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "lines": true,
+        "fill": 1,
+        "stack": true,
+        "seriesOverrides": [
+          {"alias": "critical", "color": "#F2495C"},
+          {"alias": "high", "color": "#FF9830"},
+          {"alias": "medium", "color": "#FFEE52"},
+          {"alias": "low", "color": "#73BF69"}
+        ]
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+        "type": "graph",
+        "title": "Vulnerabilities Remediated per Hour",
+        "targets": [
+          {
+            "expr": "sum(rate(vulnzero_vulnerabilities_remediated_total[1h])) by (severity, method)",
+            "legendFormat": "{{severity}} - {{method}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Remediated/hour"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "lines": true,
+        "fill": 1,
+        "stack": true
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+        "type": "graph",
+        "title": "Time to Remediation (p95)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(vulnzero_vulnerability_remediation_duration_seconds_bucket[1h])) / 3600",
+            "legendFormat": "{{severity}} p95",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "h", "label": "Hours"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "lines": true,
+        "fill": 1
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+        "type": "graph",
+        "title": "Patch Generation Duration",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(vulnzero_patch_generation_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{llm_provider}} p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(vulnzero_patch_generation_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{llm_provider}} p50",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "lines": true,
+        "fill": 1
+      },
+      {
+        "id": 9,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
+        "type": "graph",
+        "title": "Deployment Success Rate",
+        "targets": [
+          {
+            "expr": "sum(rate(vulnzero_deployments_total{status=\"success\"}[5m])) / sum(rate(vulnzero_deployments_total[5m])) * 100",
+            "legendFormat": "Success Rate %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "Success %", "min": 0, "max": 100},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "lines": true,
+        "fill": 1,
+        "thresholds": [
+          {"value": 95, "colorMode": "critical", "op": "lt", "fill": true, "line": true}
+        ]
+      },
+      {
+        "id": 10,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
+        "type": "graph",
+        "title": "LLM API Calls",
+        "targets": [
+          {
+            "expr": "sum(rate(vulnzero_llm_api_calls_total[5m])) by (provider, status)",
+            "legendFormat": "{{provider}} - {{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Calls/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "lines": true,
+        "fill": 1
+      }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1,
+    "uid": "vulnzero-business-metrics",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    }
+  }
+}
