@@ -121,6 +121,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware - secure configuration based on environment
 # Define allowed origins for development (more restrictive than "*")
+# SECURITY: Never use ["*"] wildcard - always specify explicit origins
 CORS_ORIGINS_DEV = [
     "http://localhost:3000",
     "http://localhost:5173",
