@@ -27,8 +27,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api/ /app/api/
 COPY shared/ /app/shared/
 
-# Create directory for Prometheus multiprocess metrics
-RUN mkdir -p /tmp/prometheus
+# Create non-root user and directories
+RUN useradd -m -u 1000 vulnzero && \
+    mkdir -p /tmp/prometheus /app/logs && \
+    chown -R vulnzero:vulnzero /app /tmp/prometheus
+
+# Switch to non-root user
+USER vulnzero
 
 # Expose port
 EXPOSE 8000

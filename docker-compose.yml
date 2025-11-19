@@ -2,6 +2,13 @@ version: '3.8'
 
 # VulnZero - Local Development Environment
 # Deduplicated and cleaned up docker-compose configuration
+#
+# Security Enhancements:
+# - All containers run as non-root users (configured in Dockerfiles)
+# - security_opt: no-new-privileges prevents privilege escalation
+# - cap_drop: ALL + selective cap_add minimizes Linux capabilities
+# - Resource limits prevent resource exhaustion attacks
+# - Development-appropriate settings (see docs for production hardening)
 
 services:
   # ============================================================================
@@ -26,6 +33,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
     networks:
       - vulnzero-network
 
@@ -46,6 +62,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     networks:
       - vulnzero-network
 
@@ -81,6 +106,19 @@ services:
       - ./shared:/app/shared
       - ./logs:/app/logs
     command: uvicorn services.api_gateway.main:app --host 0.0.0.0 --port 8000 --reload
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
     networks:
       - vulnzero-network
 
@@ -110,6 +148,17 @@ services:
       - ./services/aggregator:/app/services/aggregator
       - ./shared:/app/shared
       - ./logs:/app/logs
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     networks:
       - vulnzero-network
 
@@ -141,6 +190,17 @@ services:
       - ./services:/app/services
       - ./shared:/app/shared
       - ./logs:/app/logs
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
     networks:
       - vulnzero-network
 
@@ -172,6 +232,17 @@ services:
       - ./services:/app/services
       - ./shared:/app/shared
       - ./logs:/app/logs
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     networks:
       - vulnzero-network
 
@@ -193,6 +264,19 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     networks:
       - vulnzero-network
 
@@ -214,6 +298,15 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     networks:
       - vulnzero-network
 
@@ -236,6 +329,15 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     networks:
       - vulnzero-network
 
@@ -256,6 +358,15 @@ services:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
       - postgres
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     networks:
       - vulnzero-network
 
@@ -278,6 +389,17 @@ services:
       - /app/node_modules
     depends_on:
       - api
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     networks:
       - vulnzero-network
 

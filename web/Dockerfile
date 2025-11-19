@@ -2,6 +2,10 @@
 
 FROM node:18-alpine as base
 
+# Create non-root user
+RUN addgroup -g 1000 vulnzero && \
+    adduser -D -u 1000 -G vulnzero vulnzero
+
 # Set working directory
 WORKDIR /app
 
@@ -11,8 +15,11 @@ COPY package.json package-lock.json* ./
 # Install dependencies
 RUN npm ci
 
-# Copy application code
-COPY . .
+# Copy application code and set ownership
+COPY --chown=vulnzero:vulnzero . .
+
+# Switch to non-root user
+USER vulnzero
 
 # Expose Vite dev server port
 EXPOSE 5173
