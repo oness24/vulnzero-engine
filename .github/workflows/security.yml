@@ -1,0 +1,436 @@
+name: Security Scanning
+
+on:
+  # Run on pull requests for fast baseline scan
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'services/api_gateway/**'
+      - 'shared/**'
+      - '.github/workflows/security.yml'
+
+  # Weekly comprehensive API scan
+  schedule:
+    - cron: '0 2 * * 1'  # Every Monday at 2 AM UTC
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Scan type to run'
+        required: true
+        default: 'baseline'
+        type: choice
+        options:
+          - baseline
+          - api-scan
+          - both
+
+jobs:
+  # Fast baseline scan for pull requests
+  baseline-scan:
+    name: OWASP ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.scan_type == 'baseline' || github.event.inputs.scan_type == 'both'))
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: vulnzero
+          POSTGRES_PASSWORD: vulnzero_test_password
+          POSTGRES_DB: vulnzero_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set up test environment
+        env:
+          DATABASE_URL: postgresql://vulnzero:vulnzero_test_password@localhost:5432/vulnzero_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key-for-ci-only
+          ENVIRONMENT: development
+        run: |
+          # Run database migrations
+          cd shared/database
+          alembic upgrade head
+
+      - name: Start API Gateway
+        env:
+          DATABASE_URL: postgresql://vulnzero:vulnzero_test_password@localhost:5432/vulnzero_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key-for-ci-only
+          ENVIRONMENT: development
+          CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+        run: |
+          cd services/api_gateway
+          python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+
+          # Wait for API to be ready
+          echo "Waiting for API Gateway to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/api/v1/system/health > /dev/null; then
+              echo "API Gateway is ready!"
+              break
+            fi
+            echo "Attempt $i: API not ready yet..."
+            sleep 2
+          done
+
+          # Verify API is responding
+          curl http://localhost:8000/api/v1/system/health
+
+      - name: Run OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:8000'
+          rules_file_name: '.zap/zap-baseline.conf'
+          cmd_options: '-a -j -l PASS -T 10'
+          fail_action: true
+          allow_issue_writing: false
+
+      - name: Upload ZAP Baseline Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-report
+          path: |
+            report_html.html
+            report_json.json
+          retention-days: 30
+
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read ZAP report if it exists
+            let reportSummary = '✅ **OWASP ZAP Baseline Scan completed successfully**\n\n';
+
+            try {
+              const reportJson = fs.readFileSync('report_json.json', 'utf8');
+              const report = JSON.parse(reportJson);
+
+              // Count alerts by risk level
+              const alerts = report.site[0]?.alerts || [];
+              const high = alerts.filter(a => a.riskcode === '3').length;
+              const medium = alerts.filter(a => a.riskcode === '2').length;
+              const low = alerts.filter(a => a.riskcode === '1').length;
+              const info = alerts.filter(a => a.riskcode === '0').length;
+
+              reportSummary = `## 🔒 OWASP ZAP Baseline Scan Results\n\n`;
+              reportSummary += `| Risk Level | Count |\n`;
+              reportSummary += `|------------|-------|\n`;
+              reportSummary += `| 🔴 High | ${high} |\n`;
+              reportSummary += `| 🟡 Medium | ${medium} |\n`;
+              reportSummary += `| 🔵 Low | ${low} |\n`;
+              reportSummary += `| ℹ️ Info | ${info} |\n\n`;
+
+              if (high > 0) {
+                reportSummary += `⚠️ **High-risk vulnerabilities found!** Review the full report for details.\n\n`;
+              } else {
+                reportSummary += `✅ No high-risk vulnerabilities detected.\n\n`;
+              }
+
+              reportSummary += `📊 [Download full report](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
+
+            } catch (error) {
+              reportSummary += `⚠️ Could not parse ZAP report: ${error.message}\n`;
+            }
+
+            // Post comment on PR
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: reportSummary
+            });
+
+  # Comprehensive API scan (weekly or manual)
+  api-scan:
+    name: OWASP ZAP API Scan
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.scan_type == 'api-scan' || github.event.inputs.scan_type == 'both'))
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: vulnzero
+          POSTGRES_PASSWORD: vulnzero_test_password
+          POSTGRES_DB: vulnzero_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set up test environment
+        env:
+          DATABASE_URL: postgresql://vulnzero:vulnzero_test_password@localhost:5432/vulnzero_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key-for-ci-only
+          ENVIRONMENT: development
+        run: |
+          # Run database migrations
+          cd shared/database
+          alembic upgrade head
+
+      - name: Start API Gateway
+        env:
+          DATABASE_URL: postgresql://vulnzero:vulnzero_test_password@localhost:5432/vulnzero_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key-for-ci-only
+          ENVIRONMENT: development
+          CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+        run: |
+          cd services/api_gateway
+          python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+
+          # Wait for API to be ready
+          echo "Waiting for API Gateway to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/api/v1/system/health > /dev/null; then
+              echo "API Gateway is ready!"
+              break
+            fi
+            echo "Attempt $i: API not ready yet..."
+            sleep 2
+          done
+
+      - name: Export OpenAPI Specification
+        run: |
+          curl http://localhost:8000/openapi.json > .zap/openapi.json
+          cat .zap/openapi.json | head -20
+
+      - name: Run OWASP ZAP API Scan
+        uses: zaproxy/action-api-scan@v0.7.0
+        with:
+          target: 'http://localhost:8000/openapi.json'
+          format: 'openapi'
+          rules_file_name: '.zap/zap-api-scan.conf'
+          cmd_options: '-a -j -l PASS -T 60'
+          fail_action: false  # Don't fail on first run
+          allow_issue_writing: false
+
+      - name: Upload ZAP API Scan Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-api-scan-report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          retention-days: 90
+
+      - name: Analyze Results
+        if: always()
+        run: |
+          echo "=== OWASP ZAP API Scan Results ==="
+
+          if [ -f report_json.json ]; then
+            # Parse JSON report to count vulnerabilities
+            python3 << 'EOF'
+          import json
+          import sys
+
+          try:
+              with open('report_json.json', 'r') as f:
+                  report = json.load(f)
+
+              alerts = report['site'][0].get('alerts', [])
+
+              # Count by risk level
+              high = sum(1 for a in alerts if a['riskcode'] == '3')
+              medium = sum(1 for a in alerts if a['riskcode'] == '2')
+              low = sum(1 for a in alerts if a['riskcode'] == '1')
+              info = sum(1 for a in alerts if a['riskcode'] == '0')
+
+              print(f"\n📊 Vulnerability Summary:")
+              print(f"  🔴 High:   {high}")
+              print(f"  🟡 Medium: {medium}")
+              print(f"  🔵 Low:    {low}")
+              print(f"  ℹ️  Info:   {info}")
+              print(f"  ━━━━━━━━━━━━━━━━")
+              print(f"  📋 Total:  {len(alerts)}")
+
+              if high > 0:
+                  print(f"\n⚠️  HIGH RISK VULNERABILITIES FOUND!")
+                  for alert in alerts:
+                      if alert['riskcode'] == '3':
+                          print(f"  - {alert['name']}: {alert['count']} instance(s)")
+                  sys.exit(1)
+              elif medium > 5:
+                  print(f"\n⚠️  Warning: {medium} medium-risk vulnerabilities found")
+              else:
+                  print(f"\n✅ No critical vulnerabilities detected")
+
+          except Exception as e:
+              print(f"❌ Error parsing report: {e}")
+              sys.exit(1)
+          EOF
+          fi
+
+      - name: Create GitHub Issue for High-Risk Findings
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            try {
+              const reportJson = fs.readFileSync('report_json.json', 'utf8');
+              const report = JSON.parse(reportJson);
+              const alerts = report.site[0]?.alerts || [];
+              const highRisk = alerts.filter(a => a.riskcode === '3');
+
+              if (highRisk.length > 0) {
+                let issueBody = `## 🚨 High-Risk Security Vulnerabilities Detected\n\n`;
+                issueBody += `OWASP ZAP API scan found **${highRisk.length} high-risk vulnerabilities**.\n\n`;
+                issueBody += `### Vulnerabilities:\n\n`;
+
+                highRisk.forEach(alert => {
+                  issueBody += `#### ${alert.name}\n`;
+                  issueBody += `- **Risk**: ${alert.riskdesc}\n`;
+                  issueBody += `- **Confidence**: ${alert.confidence}\n`;
+                  issueBody += `- **Instances**: ${alert.count}\n`;
+                  issueBody += `- **Description**: ${alert.desc}\n`;
+                  issueBody += `- **Solution**: ${alert.solution}\n\n`;
+                });
+
+                issueBody += `\n📊 [Full Report](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
+                issueBody += `\n**Action Required**: Review and remediate these vulnerabilities immediately.\n`;
+
+                // Create issue
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `🚨 Security: ${highRisk.length} High-Risk Vulnerabilities Found`,
+                  body: issueBody,
+                  labels: ['security', 'high-priority', 'automated']
+                });
+              }
+            } catch (error) {
+              console.error('Error creating issue:', error);
+            }
+
+  # Dependency scanning with Safety
+  dependency-scan:
+    name: Python Dependency Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Safety
+        run: pip install safety
+
+      - name: Run Safety Check
+        run: |
+          echo "Scanning Python dependencies for known vulnerabilities..."
+          safety check --json --output safety-report.json || true
+
+          # Display results
+          if [ -f safety-report.json ]; then
+            python3 << 'EOF'
+          import json
+
+          try:
+              with open('safety-report.json', 'r') as f:
+                  report = json.load(f)
+
+              vulnerabilities = report.get('vulnerabilities', [])
+
+              if vulnerabilities:
+                  print(f"\n⚠️  Found {len(vulnerabilities)} vulnerable dependencies:\n")
+                  for vuln in vulnerabilities:
+                      print(f"  - {vuln['package']}: {vuln['vulnerability']}")
+                      print(f"    Installed: {vuln['installed_version']}")
+                      print(f"    Fix: Upgrade to {vuln['vulnerable_spec']}")
+                      print()
+              else:
+                  print("\n✅ No known vulnerabilities in dependencies")
+
+          except Exception as e:
+              print(f"Error parsing safety report: {e}")
+          EOF
+          fi
+
+      - name: Upload Safety Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-report
+          path: safety-report.json
+          retention-days: 30
