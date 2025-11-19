@@ -62,12 +62,13 @@ class DeploymentStrategy(ABC):
     Abstract base class for deployment strategies.
     """
 
-    def __init__(self, patch: Patch):
+    def __init__(self, patch: Patch, **kwargs):
         """
         Initialize deployment strategy.
 
         Args:
             patch: Patch to deploy
+            **kwargs: Additional parameters for specific strategies
         """
         self.patch = patch
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")

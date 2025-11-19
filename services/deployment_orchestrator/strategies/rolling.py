@@ -33,23 +33,26 @@ class RollingDeployment(DeploymentStrategy):
         batch_size: float = 0.2,
         wait_seconds: int = 60,
         max_failures: int = 2,
-        continue_on_error: bool = False
+        continue_on_error: bool = False,
+        **kwargs
     ):
         """
         Initialize rolling deployment strategy.
-        
+
         Args:
             patch: Patch to deploy
             batch_size: Fraction of assets per batch (0.2 = 20%)
             wait_seconds: Wait time between batches
             max_failures: Stop after N failures
             continue_on_error: Continue despite failures
+            **kwargs: Additional parameters (e.g., db session)
         """
-        super().__init__(patch)
+        super().__init__(patch, **kwargs)
         self.batch_size = batch_size
         self.wait_seconds = wait_seconds
         self.max_failures = max_failures
         self.continue_on_error = continue_on_error
+        self.db = kwargs.get('db')  # Store db session if provided
         
         self.logger.info(
             f"Initialized rolling deployment: "

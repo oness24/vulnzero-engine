@@ -336,7 +336,8 @@ class DeploymentEngine:
         if not strategy_class:
             raise ValueError(f"Unknown deployment strategy: {strategy}")
 
-        return strategy_class(patch=patch, **params)
+        # Pass database session to strategy for rollback operations
+        return strategy_class(patch=patch, db=self.db, **params)
 
     def _create_audit_log(
         self,

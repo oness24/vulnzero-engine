@@ -25,9 +25,10 @@ class AllAtOnceDeployment(DeploymentStrategy):
     dev/test environments or when downtime is acceptable.
     """
 
-    def __init__(self, patch):
+    def __init__(self, patch, **kwargs):
         """Initialize all-at-once strategy"""
-        super().__init__(patch)
+        super().__init__(patch, **kwargs)
+        self.db = kwargs.get('db')  # Store db session if provided
         self.logger.info("Initialized all-at-once deployment strategy")
 
     def validate_prerequisites(self, assets: List[Asset]) -> tuple[bool, str]:

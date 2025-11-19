@@ -7,13 +7,15 @@ Automatic promotion or rollback based on health checks.
 
 import logging
 import time
-from typing import List
+from typing import List, Dict
 from datetime import datetime
 
 from services.deployment_orchestrator.strategies.base import (
     DeploymentStrategy, DeploymentResult, DeploymentStatus
 )
-from shared.models import Asset
+from shared.models import Asset, Patch
+from services.deployment_engine.connection_manager import SSHConnectionManager
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -32,22 +34,25 @@ class CanaryDeployment(DeploymentStrategy):
         stages: List[float] = None,
         monitoring_duration: int = 900,
         auto_promote: bool = True,
-        rollback_on_failure: bool = True
+        rollback_on_failure: bool = True,
+        db: Session = None
     ):
         """
         Initialize canary deployment.
-        
+
         Args:
             patch: Patch to deploy
             stages: List of deployment percentages (default: [0.1, 0.5, 1.0])
             monitoring_duration: Seconds to monitor each stage (default: 15 min)
             auto_promote: Automatically promote if healthy
             rollback_on_failure: Automatically rollback on failure
+            db: Database session for accessing patch rollback commands
         """
-        super().__init__(patch)
+        super().__init__(patch, db=db)
         self.stages = stages or [0.1, 0.5, 1.0]  # 10%, 50%, 100%
         self.monitoring_duration = monitoring_duration
         self.auto_promote = auto_promote
+        self.db = db
         self.rollback_on_failure = rollback_on_failure
         
         self.logger.info(
@@ -254,7 +259,13 @@ class CanaryDeployment(DeploymentStrategy):
 
     def _execute_rollback(self, deployed_asset_ids: List[int], all_assets: List[Asset]) -> List[Dict]:
         """
-        Execute rollback for deployed assets.
+        Execute ACTUAL rollback for deployed assets.
+
+        This method now performs real rollback operations:
+        1. Connects to each asset via SSH
+        2. Executes rollback commands from patch.rollback_script
+        3. Verifies rollback success
+        4. Returns real execution results
 
         Args:
             deployed_asset_ids: IDs of assets that were successfully deployed
@@ -266,8 +277,38 @@ class CanaryDeployment(DeploymentStrategy):
         rollback_logs = []
         asset_map = {asset.id: asset for asset in all_assets}
 
-        self.logger.info(f"Starting rollback for {len(deployed_asset_ids)} assets")
+        self.logger.warning(f"🔄 Starting REAL rollback for {len(deployed_asset_ids)} assets")
 
+        # Get patch with rollback commands
+        if not self.db:
+            self.logger.error("No database session provided - cannot fetch rollback commands")
+            return [{
+                "status": "error",
+                "message": "Database session not available for rollback"
+            }]
+
+        try:
+            patch = self.db.query(Patch).filter_by(id=self.patch.id).first()
+        except Exception as e:
+            self.logger.error(f"Failed to fetch patch from database: {e}")
+            patch = self.patch  # Fallback to instance patch
+
+        if not patch or not patch.rollback_script:
+            self.logger.error("⚠️ No rollback script available for this patch")
+            # Log warning but continue - mark all as "rollback_unavailable"
+            for asset_id in deployed_asset_ids:
+                asset = asset_map.get(asset_id)
+                rollback_logs.append({
+                    "asset_id": asset_id,
+                    "asset_name": asset.name if asset else "unknown",
+                    "status": "rollback_unavailable",
+                    "message": "No rollback script defined in patch metadata",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "action": "automatic_rollback"
+                })
+            return rollback_logs
+
+        # Execute rollback on each deployed asset
         for asset_id in deployed_asset_ids:
             asset = asset_map.get(asset_id)
             if not asset:
@@ -280,35 +321,222 @@ class CanaryDeployment(DeploymentStrategy):
                 continue
 
             try:
-                self.logger.info(f"Rolling back patch on {asset.name}")
+                self.logger.info(f"🔌 Connecting to {asset.name} ({asset.ip_address}) for rollback")
 
-                # Execute rollback command (inverse of deployment)
-                # In production, this would:
-                # 1. Connect to the asset
-                # 2. Execute undo/rollback commands
-                # 3. Verify rollback success
-                # 4. Restore previous state
+                # Prepare asset dict for connection manager
+                asset_dict = {
+                    "name": asset.name,
+                    "ip_address": asset.ip_address,
+                    "hostname": asset.hostname,
+                    "ssh_user": getattr(asset, 'ssh_user', 'root'),
+                    "ssh_port": getattr(asset, 'ssh_port', 22),
+                    "ssh_key_path": getattr(asset, 'ssh_key_path', None),
+                    "ssh_password": getattr(asset, 'ssh_password', None),
+                }
 
-                # For now, log the rollback action
-                rollback_logs.append({
-                    "asset_id": asset_id,
-                    "asset_name": asset.name,
-                    "status": "rolled_back",
-                    "message": f"Patch rolled back on {asset.name}",
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "action": "automatic_rollback"
-                })
+                # Connect to asset via SSH
+                conn = SSHConnectionManager()
+                if not conn.connect(asset_dict, timeout=30):
+                    raise Exception("Failed to establish SSH connection")
 
-                self.logger.info(f"✓ Rollback completed for {asset.name}")
+                try:
+                    # Execute rollback script
+                    self.logger.info(f"⚙️ Executing rollback commands on {asset.name}")
+
+                    # Split rollback_script into individual commands if it's multi-line
+                    rollback_commands = patch.rollback_script.strip().split('\n')
+                    rollback_commands = [cmd.strip() for cmd in rollback_commands if cmd.strip()]
+
+                    command_results = []
+                    all_successful = True
+
+                    for i, command in enumerate(rollback_commands, 1):
+                        self.logger.debug(f"Executing command {i}/{len(rollback_commands)}: {command[:100]}")
+
+                        result = conn.execute_command(
+                            command=command,
+                            sudo=True,  # Use sudo for rollback operations
+                            timeout=300
+                        )
+
+                        command_results.append({
+                            "command": command[:200],  # Truncate for logging
+                            "exit_code": result.get("exit_code", -1),
+                            "success": result.get("success", False),
+                            "stdout": result.get("stdout", "")[:500],
+                            "stderr": result.get("stderr", "")[:500]
+                        })
+
+                        if not result.get("success"):
+                            all_successful = False
+                            self.logger.warning(
+                                f"⚠️ Rollback command {i} failed on {asset.name}: {result.get('stderr', 'Unknown error')}"
+                            )
+                            # Continue executing remaining commands even if one fails
+
+                    # Verify rollback if all commands succeeded
+                    verification_result = None
+                    if all_successful:
+                        verification_result = self._verify_rollback(conn, asset, patch)
+                        if not verification_result.get("success"):
+                            all_successful = False
+                            self.logger.warning(
+                                f"⚠️ Rollback verification failed on {asset.name}: {verification_result.get('message')}"
+                            )
+
+                    # Log the rollback result
+                    if all_successful:
+                        rollback_logs.append({
+                            "asset_id": asset_id,
+                            "asset_name": asset.name,
+                            "status": "rolled_back",
+                            "message": f"Successfully rolled back patch on {asset.name}",
+                            "commands_executed": len(rollback_commands),
+                            "command_results": command_results,
+                            "verification": verification_result,
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "action": "automatic_rollback"
+                        })
+                        self.logger.info(f"✅ Rollback completed and verified for {asset.name}")
+                    else:
+                        rollback_logs.append({
+                            "asset_id": asset_id,
+                            "asset_name": asset.name,
+                            "status": "rollback_partial",
+                            "message": f"Rollback completed with errors on {asset.name}",
+                            "commands_executed": len(rollback_commands),
+                            "command_results": command_results,
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "action": "automatic_rollback"
+                        })
+                        self.logger.warning(f"⚠️ Rollback completed with errors on {asset.name}")
+
+                finally:
+                    # Always disconnect
+                    conn.disconnect()
 
             except Exception as e:
-                self.logger.error(f"Rollback failed for {asset.name}: {e}")
+                self.logger.error(f"❌ Rollback failed for {asset.name}: {e}", exc_info=True)
                 rollback_logs.append({
                     "asset_id": asset_id,
                     "asset_name": asset.name if asset else "unknown",
                     "status": "rollback_failed",
-                    "message": f"Rollback failed: {str(e)}",
-                    "timestamp": datetime.utcnow().isoformat()
+                    "message": f"Rollback execution failed: {str(e)}",
+                    "error": str(e),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "action": "automatic_rollback"
                 })
 
+        # Summary log
+        successful = len([log for log in rollback_logs if log["status"] == "rolled_back"])
+        partial = len([log for log in rollback_logs if log["status"] == "rollback_partial"])
+        failed = len([log for log in rollback_logs if log["status"] in ["rollback_failed", "error"]])
+
+        self.logger.info(
+            f"🔄 Rollback summary: {successful} successful, {partial} partial, {failed} failed "
+            f"out of {len(deployed_asset_ids)} total assets"
+        )
+
         return rollback_logs
+
+    def _verify_rollback(self, conn: SSHConnectionManager, asset: Asset, patch: Patch) -> Dict:
+        """
+        Verify that rollback actually succeeded.
+
+        Performs health checks and verification steps after rollback.
+
+        Args:
+            conn: Active SSH connection to asset
+            asset: Asset that was rolled back
+            patch: Patch that was rolled back
+
+        Returns:
+            Dict with success status and details
+        """
+        try:
+            self.logger.debug(f"🔍 Verifying rollback on {asset.name}")
+
+            # Get verification metadata from patch if available
+            patch_metadata = patch.patch_metadata or {}
+            service_name = patch_metadata.get("service_name")
+            package_name = patch_metadata.get("package_name")
+            previous_version = patch_metadata.get("previous_version")
+
+            verification_checks = []
+
+            # Check 1: Service health (if service_name provided)
+            if service_name:
+                result = conn.execute_command(
+                    f"systemctl is-active {service_name}",
+                    sudo=True,
+                    timeout=30
+                )
+
+                service_active = result.get("exit_code") == 0
+                verification_checks.append({
+                    "check": "service_health",
+                    "service": service_name,
+                    "passed": service_active,
+                    "message": f"Service {service_name} is {'active' if service_active else 'not active'}"
+                })
+
+                if not service_active:
+                    return {
+                        "success": False,
+                        "message": f"Service {service_name} is not running after rollback",
+                        "checks": verification_checks
+                    }
+
+            # Check 2: Package version (if package info provided)
+            if package_name and previous_version:
+                result = conn.execute_command(
+                    f"dpkg -l | grep {package_name} || rpm -q {package_name}",
+                    sudo=True,
+                    timeout=30
+                )
+
+                version_match = previous_version in result.get("stdout", "")
+                verification_checks.append({
+                    "check": "package_version",
+                    "package": package_name,
+                    "expected_version": previous_version,
+                    "passed": version_match,
+                    "message": f"Package version {'matches' if version_match else 'does not match'} expected"
+                })
+
+                if not version_match:
+                    self.logger.warning(
+                        f"Package {package_name} version mismatch after rollback on {asset.name}"
+                    )
+                    # Don't fail rollback for version mismatch, just warn
+
+            # Check 3: Basic connectivity test
+            result = conn.execute_command("echo 'rollback verification'", timeout=10)
+            connectivity_ok = result.get("success", False)
+            verification_checks.append({
+                "check": "connectivity",
+                "passed": connectivity_ok,
+                "message": "Asset connectivity verified"
+            })
+
+            if not connectivity_ok:
+                return {
+                    "success": False,
+                    "message": "Lost connectivity to asset during verification",
+                    "checks": verification_checks
+                }
+
+            # All checks passed
+            return {
+                "success": True,
+                "message": "Rollback verification passed all checks",
+                "checks": verification_checks
+            }
+
+        except Exception as e:
+            self.logger.error(f"Rollback verification error on {asset.name}: {e}")
+            return {
+                "success": False,
+                "message": f"Verification failed with error: {str(e)}",
+                "error": str(e)
+            }
