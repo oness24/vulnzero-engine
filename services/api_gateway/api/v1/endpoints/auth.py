@@ -23,33 +23,10 @@ from services.api_gateway.schemas.auth import (
     LogoutResponse,
 )
 from shared.config.settings import settings
+from shared.models.models import User
+from datetime import datetime
 
 router = APIRouter()
-
-# Demo users for MVP (replace with database User model in production)
-DEMO_USERS = {
-    "admin@vulnzero.com": {
-        "id": "1",
-        "email": "admin@vulnzero.com",
-        "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7667fJmFni",  # password: Admin123!
-        "role": "admin",
-        "name": "Admin User",
-    },
-    "operator@vulnzero.com": {
-        "id": "2",
-        "email": "operator@vulnzero.com",
-        "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7667fJmFni",  # password: Operator123!
-        "role": "operator",
-        "name": "Operator User",
-    },
-    "viewer@vulnzero.com": {
-        "id": "3",
-        "email": "viewer@vulnzero.com",
-        "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7667fJmFni",  # password: Viewer123!
-        "role": "viewer",
-        "name": "Viewer User",
-    },
-}
 
 
 @router.post(
@@ -73,8 +50,8 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """
     Authenticate user and return JWT access and refresh tokens.
     """
-    # Get user from demo users (replace with database query)
-    user = DEMO_USERS.get(login_data.email)
+    # Get user from database
+    user = db.query(User).filter(User.email == login_data.email).first()
 
     if not user:
         raise HTTPException(
@@ -83,23 +60,41 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Check if user is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
     # Verify password
-    if not verify_password(login_data.password, user["password_hash"]):
+    if not verify_password(login_data.password, user.hashed_password):
+        # Increment failed login attempts
+        user.failed_login_attempts += 1
+        db.commit()
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Reset failed login attempts and update last login
+    user.failed_login_attempts = 0
+    user.last_login_at = datetime.utcnow()
+    # Note: In production, get IP from request headers
+    # user.last_login_ip = request.client.host
+    db.commit()
+
     # Create tokens
     token_data = {
-        "sub": user["id"],
-        "email": user["email"],
-        "role": user["role"],
+        "sub": str(user.id),
+        "email": user.email,
+        "role": user.role.value,
     }
 
     access_token = create_access_token(token_data)
-    refresh_token = create_refresh_token({"sub": user["id"]})
+    refresh_token = create_refresh_token({"sub": str(user.id)})
 
     return LoginResponse(
         access_token=access_token,
@@ -107,10 +102,10 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         token_type="bearer",
         expires_in=settings.jwt_access_token_expire_minutes * 60,
         user={
-            "id": user["id"],
-            "email": user["email"],
-            "role": user["role"],
-            "name": user["name"],
+            "id": str(user.id),
+            "email": user.email,
+            "role": user.role.value,
+            "name": user.full_name or user.username,
         },
     )
 
@@ -126,7 +121,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     requiring the user to log in again.
     """,
 )
-async def refresh_token(refresh_data: TokenRefreshRequest):
+async def refresh_token(refresh_data: TokenRefreshRequest, db: Session = Depends(get_db)):
     """
     Refresh access token using refresh token.
     """
@@ -140,12 +135,16 @@ async def refresh_token(refresh_data: TokenRefreshRequest):
             detail="Invalid refresh token",
         )
 
-    # Find user (in demo, search by ID)
-    user = None
-    for email, user_data in DEMO_USERS.items():
-        if user_data["id"] == user_id:
-            user = user_data
-            break
+    # Fetch user from database
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID in token",
+        )
+
+    user = db.query(User).filter(User.id == user_id_int).first()
 
     if not user:
         raise HTTPException(
@@ -153,11 +152,18 @@ async def refresh_token(refresh_data: TokenRefreshRequest):
             detail="User not found",
         )
 
+    # Check if user is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
     # Create new access token
     token_data = {
-        "sub": user["id"],
-        "email": user["email"],
-        "role": user["role"],
+        "sub": str(user.id),
+        "email": user.email,
+        "role": user.role.value,
     }
 
     access_token = create_access_token(token_data)

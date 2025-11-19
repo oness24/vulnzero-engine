@@ -140,6 +140,8 @@ async def get_current_user(
     Raises:
         HTTPException: If token is invalid or user not found
     """
+    from shared.models.models import User
+
     token = credentials.credentials
     payload = verify_token(token, token_type="access")
 
@@ -151,12 +153,41 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # TODO: Fetch user from database once User model is implemented
-    # For now, return payload data
+    # Fetch user from database
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID in token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    db_user = db.query(User).filter(User.id == user_id_int).first()
+
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Check if user is active
+    if not db_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    # Return user information as dict
     user = {
-        "id": user_id,
-        "email": payload.get("email"),
-        "role": payload.get("role", "viewer"),
+        "id": db_user.id,
+        "username": db_user.username,
+        "email": db_user.email,
+        "full_name": db_user.full_name,
+        "role": db_user.role.value,
+        "is_superuser": db_user.is_superuser,
+        "is_active": db_user.is_active,
     }
 
     return user
