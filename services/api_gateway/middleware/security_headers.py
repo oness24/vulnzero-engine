@@ -24,10 +24,29 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     - X-Frame-Options: Prevents clickjacking
     - X-XSS-Protection: XSS filter for older browsers
     - Strict-Transport-Security: Forces HTTPS
-    - Content-Security-Policy: Restricts resource loading
+    - Content-Security-Policy: Restricts resource loading (environment-specific)
     - Referrer-Policy: Controls referrer information
     - Permissions-Policy: Controls browser features
+
+    CSP Policy:
+    - Production: Strict policy without unsafe-inline or unsafe-eval
+    - Development: Relaxed policy to support hot-reloading and debugging
     """
+
+    def __init__(self, app):
+        """Initialize middleware with environment-specific CSP"""
+        super().__init__(app)
+        self.is_production = settings.environment == "production"
+        self.is_development = settings.is_development
+
+        # Log CSP configuration on startup
+        if self.is_production:
+            logger.info("SecurityHeadersMiddleware: Using STRICT CSP for production")
+        else:
+            logger.warning(
+                "SecurityHeadersMiddleware: Using RELAXED CSP for development. "
+                "This includes unsafe-inline and unsafe-eval."
+            )
 
     async def dispatch(self, request: Request, call_next):
         """Process request and add security headers to response"""
@@ -45,29 +64,53 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Force HTTPS for 1 year (31536000 seconds)
         # includeSubDomains: Apply to all subdomains
         # preload: Allow inclusion in browser HSTS preload lists
-        response.headers["Strict-Transport-Security"] = (
-            "max-age=31536000; includeSubDomains; preload"
-        )
+        if self.is_production:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains; preload"
+            )
+        else:
+            # Shorter max-age for development to allow easier testing
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=3600"
+            )
 
-        # Content Security Policy
-        # default-src 'self': Only load resources from same origin
-        # script-src: Allow scripts from self and inline (needed for some frameworks)
-        # style-src: Allow styles from self and inline
-        # img-src: Allow images from self and data URIs
-        # font-src: Allow fonts from self
-        # connect-src: Allow AJAX/WebSocket to self
-        # frame-ancestors 'none': Prevent embedding (similar to X-Frame-Options)
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "font-src 'self' data:; "
-            "connect-src 'self'; "
-            "frame-ancestors 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
-        )
+        # Content Security Policy - Environment Specific
+        if self.is_production:
+            # STRICT CSP for production - No unsafe-inline or unsafe-eval
+            # This is more secure but requires:
+            # 1. All inline scripts moved to external files
+            # 2. No eval() usage in code
+            # 3. Proper CSP nonces for any necessary inline scripts
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self'; "  # No unsafe-inline or unsafe-eval!
+                "style-src 'self'; "  # No unsafe-inline!
+                "img-src 'self' data: https:; "
+                "font-src 'self' data:; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'; "
+                "object-src 'none'; "
+                "upgrade-insecure-requests"
+            )
+        else:
+            # RELAXED CSP for development - Allows unsafe-inline and unsafe-eval
+            # Needed for:
+            # - React/Vue development builds with hot module replacement
+            # - Development tools that inject inline scripts
+            # - Source maps and debugging
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' data:; "
+                "connect-src 'self' ws: wss:; "  # Allow WebSocket for dev
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'"
+            )
 
         # Control referrer information
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
