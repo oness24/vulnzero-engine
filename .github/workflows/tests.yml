@@ -43,9 +43,13 @@ jobs:
       run: |
         python -m pytest tests/unit/services/test_deployment_orchestrator.py -v --tb=short --cov=services/deployment_orchestrator --cov-append --cov-report=xml --cov-report=term
 
-    - name: Run all tests with coverage
+    - name: Run all unit tests with coverage
       run: |
-        python -m pytest tests/unit/models tests/unit/services -v --cov=shared --cov=services/monitoring --cov=services/deployment_orchestrator --cov-report=xml --cov-report=term --cov-fail-under=60
+        python -m pytest tests/unit/ tests/security/ -v --cov=shared --cov=services/monitoring --cov=services/deployment_orchestrator --cov-report=xml --cov-report=term --cov-fail-under=60 -m "not requires_llm and not slow"
+
+    - name: Run security feature tests
+      run: |
+        python -m pytest tests/security/test_security_headers.py tests/security/test_llm_sanitizer.py -v --tb=short
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
