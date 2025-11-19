@@ -33,7 +33,7 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     """
     Application lifespan events.
-    Runs on startup and shutdown.
+    Runs on startup and shutdown with graceful handling.
     """
     # Startup
     logger.info("🚀 Starting VulnZero API Gateway...")
@@ -41,10 +41,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"API Docs: http://localhost:8000/docs")
 
+    # Initialize connections
+    try:
+        from shared.cache import get_redis_client
+        await get_redis_client()
+        logger.info("✓ Redis connection initialized")
+    except Exception as e:
+        logger.warning(f"⚠ Redis initialization failed (non-critical): {e}")
+
     yield
 
-    # Shutdown
-    logger.info("🛑 Shutting down VulnZero API Gateway...")
+    # Graceful Shutdown
+    logger.info("🛑 Initiating graceful shutdown...")
+
+    # Close Redis connection
+    try:
+        from shared.cache import close_redis_client
+        await close_redis_client()
+        logger.info("✓ Redis connection closed")
+    except Exception as e:
+        logger.error(f"Error closing Redis: {e}")
+
+    # Close database connections
+    try:
+        from shared.config.database import engine
+        engine.dispose()
+        logger.info("✓ Database connections closed")
+    except Exception as e:
+        logger.error(f"Error closing database: {e}")
+
+    logger.info("✓ Graceful shutdown complete")
 
 
 # Create FastAPI application
@@ -218,30 +244,63 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health_check():
     """
-    Health check endpoint.
-    Returns the health status of the API and its dependencies.
+    Comprehensive health check endpoint.
+    Returns detailed health status of the API and all its dependencies.
+
+    Use for monitoring dashboards and detailed diagnostics.
     """
-    from shared.config.database import engine
+    from shared.health import health_checker
 
-    # Check database connection
-    db_healthy = True
-    try:
-        with engine.connect() as conn:
-            conn.execute("SELECT 1")
-    except Exception as e:
-        logger.error(f"Database health check failed: {e}")
-        db_healthy = False
+    health_status = await health_checker.check_health(include_optional=True)
 
-    health_status = {
-        "status": "healthy" if db_healthy else "unhealthy",
-        "api": "operational",
-        "database": "connected" if db_healthy else "disconnected",
-        "timestamp": time.time(),
-    }
-
-    status_code = status.HTTP_200_OK if db_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
+    # Return 503 if unhealthy, 200 otherwise
+    status_code = (
+        status.HTTP_503_SERVICE_UNAVAILABLE
+        if health_status["status"] == "unhealthy"
+        else status.HTTP_200_OK
+    )
 
     return JSONResponse(content=health_status, status_code=status_code)
+
+
+@app.get("/health/live", tags=["Health"])
+async def liveness_check():
+    """
+    Kubernetes liveness probe endpoint.
+
+    This endpoint checks if the application is alive and running.
+    It should always return 200 unless the application is truly dead.
+
+    Kubernetes will restart the container if this fails.
+    """
+    from shared.health import health_checker
+
+    liveness_status = await health_checker.check_liveness()
+    return JSONResponse(content=liveness_status, status_code=status.HTTP_200_OK)
+
+
+@app.get("/health/ready", tags=["Health"])
+async def readiness_check():
+    """
+    Kubernetes readiness probe endpoint.
+
+    This endpoint checks if the application is ready to serve traffic.
+    It validates that critical dependencies (database, redis) are available.
+
+    Kubernetes will remove from load balancer if this fails.
+    """
+    from shared.health import health_checker
+
+    readiness_status = await health_checker.check_readiness()
+
+    # Return 503 if not ready
+    status_code = (
+        status.HTTP_200_OK
+        if readiness_status["ready"]
+        else status.HTTP_503_SERVICE_UNAVAILABLE
+    )
+
+    return JSONResponse(content=readiness_status, status_code=status_code)
 
 
 # ============================================================================

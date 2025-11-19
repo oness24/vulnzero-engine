@@ -145,7 +145,9 @@ services:
       --access-log
       --no-use-colors
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # Use readiness probe for production health checks
+      # This checks database and redis connectivity
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
       interval: 30s
       timeout: 10s
       retries: 3
