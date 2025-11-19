@@ -8,13 +8,29 @@ tests/
 ├── test_config.py              # Configuration module tests
 ├── test_models.py              # Database model tests
 ├── test_schemas.py             # Pydantic schema validation tests
-└── api/
-    ├── test_auth.py            # Authentication endpoint tests
-    ├── test_vulnerabilities.py # Vulnerability management tests
-    ├── test_assets.py          # Asset management tests
-    ├── test_patches.py         # Patch management tests
-    ├── test_deployments.py     # Deployment management tests
-    └── test_system.py          # System health and metrics tests
+├── api/
+│   ├── test_auth.py            # Authentication endpoint tests
+│   ├── test_vulnerabilities.py # Vulnerability management tests
+│   ├── test_assets.py          # Asset management tests
+│   ├── test_patches.py         # Patch management tests
+│   ├── test_deployments.py     # Deployment management tests
+│   └── test_system.py          # System health and metrics tests
+├── security/                   # Security-focused tests
+│   ├── test_authentication.py  # Auth security tests
+│   ├── test_sql_injection.py   # SQL injection prevention
+│   ├── test_security_headers.py # Security headers middleware (40+ tests)
+│   └── test_llm_sanitizer.py   # LLM prompt injection sanitizer (50+ tests)
+├── integration/                # Integration tests
+│   ├── test_end_to_end.py      # E2E workflow tests
+│   ├── test_service_integration.py
+│   └── test_security_integration.py # Security feature integration
+└── unit/                       # Unit tests organized by module
+    ├── api/                    # API unit tests
+    ├── models/                 # Model unit tests
+    ├── services/               # Service unit tests
+    └── shared/                 # Shared module unit tests
+        ├── middleware/         # Middleware tests
+        └── utils/              # Utility tests
 ```
 
 ## Running Tests
@@ -141,6 +157,55 @@ pytest -m integration       # Run only integration tests
 - ✅ Metrics authentication
 - ✅ Root endpoint
 
+### Security Headers Tests (security/test_security_headers.py) **NEW**
+- ✅ Development mode CSP (permissive for HMR)
+- ✅ Production mode CSP (strict, no unsafe-inline/eval)
+- ✅ HSTS header (production only, 1-year max-age)
+- ✅ X-Frame-Options (DENY for clickjacking prevention)
+- ✅ X-Content-Type-Options (nosniff for MIME-sniffing prevention)
+- ✅ Referrer-Policy (strict-origin-when-cross-origin)
+- ✅ Permissions-Policy (restricts dangerous features)
+- ✅ X-XSS-Protection (1; mode=block)
+- ✅ Headers applied to all endpoints (including errors)
+- ✅ Headers applied to JSON responses
+- ✅ Headers applied to multiple requests
+- ✅ No duplicate headers
+- ✅ Environment-aware configuration
+- **Coverage**: 100% (40+ test cases)
+
+### LLM Sanitizer Tests (security/test_llm_sanitizer.py) **NEW**
+- ✅ Instruction override detection
+- ✅ System impersonation detection
+- ✅ Role manipulation detection
+- ✅ Instruction leak detection
+- ✅ Jailbreak attempt detection (DAN mode, evil mode, etc.)
+- ✅ Code execution detection (exec, eval, __import__)
+- ✅ Command injection detection (shell metacharacters)
+- ✅ SQL injection detection (' OR 1=1--, etc.)
+- ✅ Path traversal detection (../../etc/passwd)
+- ✅ XSS/HTML injection detection
+- ✅ False positive prevention (legitimate vuln descriptions)
+- ✅ Sanitization levels (Permissive, Moderate, Strict)
+- ✅ Length truncation (10,000 char max)
+- ✅ Unicode character handling
+- ✅ Special character handling
+- ✅ Multiple pattern detection
+- ✅ Parameterized tests for all attack types
+- **Coverage**: 95%+ (50+ test cases)
+
+### Security Integration Tests (integration/test_security_integration.py) **NEW**
+- ✅ Security headers on all endpoints
+- ✅ LLM injection blocking
+- ✅ Legitimate request allowance
+- ✅ Headers persist through LLM processing
+- ✅ Multiple security layers working together
+- ✅ Headers on error responses
+- ✅ No information leakage in errors
+- ✅ Concurrent request handling
+- ✅ Security overhead measurement
+- ✅ Defense-in-depth validation (sanitization + CSP)
+- **Coverage**: End-to-end security workflows
+
 ## Fixtures Available
 
 ### Database Fixtures
@@ -228,13 +293,29 @@ CI pipeline:
 
 Mark tests with pytest markers:
 ```python
-@pytest.mark.unit
-@pytest.mark.integration
-@pytest.mark.slow
+@pytest.mark.unit          # Unit tests
+@pytest.mark.integration   # Integration tests
+@pytest.mark.security      # Security tests **NEW**
+@pytest.mark.slow          # Slow-running tests
+@pytest.mark.requires_llm  # Requires LLM API keys
+@pytest.mark.requires_db   # Requires database
+@pytest.mark.requires_docker # Requires Docker
 ```
 
 Run specific markers:
 ```bash
+# Run only unit tests
 pytest -m unit
+
+# Run only security tests
+pytest -m security
+
+# Skip slow tests
 pytest -m "not slow"
+
+# Skip tests requiring LLM API keys
+pytest -m "not requires_llm"
+
+# Run security and integration tests
+pytest -m "security or integration"
 ```
